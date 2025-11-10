@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/assets/liveicon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allumiqs Reception">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Allumiqs APP (Web)</title>
+  <style>
+    :root{
+      --primary: rgba(54,189,178,1);
+      --primary-weak: rgba(54,189,178,0.12);
+      --ink: #00334f;
+      --accent: #00c0f3;
+      --card: #ffffff;
+      --radius: 16px;
+      --bg: #f5f7fa;
+      --page-pad: 24px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .appbar{
+      display:flex; align-items:center; gap:12px; padding:14px 16px;
+      background: linear-gradient(90deg, var(--accent), var(--primary));
+      color:white; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      position:sticky; top:0; z-index:10;
+    }
+    .wrap{ max-width: 1200px; margin: 16px auto; padding: 0 var(--page-pad) 24px var(--page-pad); }
+    .card{ background: var(--card); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(2,10,20,.06); padding: 20px; margin: 16px 0; }
+  /* Slightly more breathing room for Samples card */
+  #samples_form{ padding: 28px; }
+  #samples_form .actions{ margin-top: 10px; }
+    /* PM badge + BSL2 indicator */
+    .pm-badge{ display:inline-flex; align-items:center; gap:8px; }
+    .pm-avatar{ width:26px; height:26px; border-radius:999px; color:#fff; font-weight:700; display:inline-flex; align-items:center; justify-content:center; font-size:12px; letter-spacing:.3px; text-transform:uppercase; box-shadow:0 1px 2px rgba(0,0,0,.15); }
+    .pm-name{ font-weight:600; color:#0b3b56; }
+  .pm-label{ font-weight:600; color:#0b3b56; }
+    .samples-meta{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .bsl2-flag{ display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#b30000; background:#fde7e7; padding:2px 10px; border-radius:999px; border:1px solid #f2b3b3; }
+    .bsl2-flag.no{ color:#374151; background:#f3f4f6; border-color:#e5e7eb; font-weight:600; }
+  .fraction-hint{ color:#6b7280; margin-left:8px; white-space:nowrap; }
+  /* Compact qty input next to fraction */
+  #samples_quantity{ width: 140px; }
+  /* Same compact width for Other form quantity */
+  #quantity{ width: 140px; }
+    #item_type_toggle{ display:flex; gap:16px; flex-wrap:nowrap; align-items:stretch; }
+    .item-type-square{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; width:160px; height:160px; margin:10px; border:2px solid #d0d5dd; border-radius:24px; background:#fff; font-size:1.2em; font-weight:600; color:#00334f; cursor:pointer; transition:border-color .2s, box-shadow .2s; box-shadow:0 4px 16px rgba(54,189,178,0.08); }
+    .item-type-square.selected{ border-color: var(--primary); box-shadow: 0 8px 24px rgba(54,189,178,0.18); background: var(--primary-weak); }
+  .item-type-square img{ display:block; width:64px; height:64px; object-fit:contain; margin-bottom:10px; user-select:none; -webkit-user-drag:none; pointer-events:none; }
+    .row{ display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; }
+    .col-6{ grid-column: span 6; } .col-12{ grid-column: span 12; }
+    label{display:block; font-weight:600; margin-bottom:6px}
+    input, select, textarea{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d0d5dd; background:white; outline:none; font-size:14px; }
+    input:focus, select:focus, textarea:focus{border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak)}
+    .actions{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .btn{ appearance:none; border:none; border-radius:999px; padding:10px 16px; font-weight:600; cursor:pointer; background: var(--primary); color:#00334f; box-shadow: 0 4px 10px rgba(54,189,178,.3); }
+    .btn.secondary{ background:#e9eef3; color:#0b3b56; box-shadow:none }
+    .hint{font-size:12px; color:#6b7280; margin-top:6px}
+    @media (max-width: 920px){ .wrap{min-width:1100px} }
+  #global_loading_overlay{display:none; opacity:0; pointer-events:none; transition:opacity .28s ease; border:4px solid transparent; box-sizing:border-box;}
+    #global_loading_overlay.visible{opacity:1;pointer-events:all;}
+    #global_loading_overlay.success{border-color:#0a7a4d;} #global_loading_overlay.warning{border-color:#d08700;} #global_loading_overlay.error{border-color:#b30000;}
+  </style>
+</head>
+<body>
+  <div class="appbar" style="display:flex; align-items:center; justify-content:space-between;">
+    <div style="flex:1; display:flex; align-items:center;">
+      <img src="/static/assets/Allumiqs-Logo-W.png" style="height:56px; width:auto; display:block;"/>
+    </div>
+    <div style="flex:1; text-align:center; font-size:20px; font-weight:700;">Reception Form</div>
+    <div style="flex:1;"></div>
+  </div>
+
+  <div class="wrap">
+    
+    <div class="card">
+      <div class="row"><div class="col-12">
+        <h2>Item Type</h2>
+        <div id="item_type_toggle" class="actions">
+          <button type="button" class="item-type-square" data-value="Samples"
+          image-url="/static/assets/clickup-logo.png">Samples</button>
+          <button type="button" class="item-type-square" data-value="Other"
+          image-url="/static/assets/quartzy-logo.png">Other</button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Samples Form (kept minimal so UI loads) -->
+    <div class="card" id="samples_form" style="display:none;">
+      <h2>Samples Reception</h2>
+      <div id="samples_form_content">
+        <label for="samples_project">Project</label>
+        <select id="samples_project"><option value="">Select Project</option></select>
+        <div id="samples_fields"></div>
+      </div>
+      <div class="actions"><button class="btn" id="samples_submit_btn">Confirm Reception</button></div>
+      <div id="samples_status" class="hint" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Other Items Form -->
+    <div class="card" id="other_form" style="display:none;">
+      <div class="row">
+        <div class="col-12">
+          <label for="quartzy_order">Quartzy Order Request</label>
+          <select id="quartzy_order"><option value="">Select Order Request</option></select>
+          <div class="hint" id="quartzy_order_hint">Only ORDERED requests are listed.</div>
+        </div>
+        <div class="col-6">
+          <label>Item Name</label>
+          <input id="item_name" placeholder="Item Name" required>
+        </div>
+        <div class="col-6">
+          <label>Number of Items</label>
+          <div style="display:flex; align-items:center;">
+            <input id="quantity" type="number" min="0" placeholder="Number of Items">
+            <span class="fraction-hint" id="quantity_fraction" style="display:none;"></span>
+          </div>
+        </div>
+        <div class="col-6">
+          <label>Vendor</label>
+          <input id="supplier" placeholder="Vendor">
+        </div>
+        <div class="col-6">
+          <label>Catalog Number</label>
+          <div class="actions">
+            <input id="catalog_number" placeholder="Catalog Number" style="flex:1;">
+            <button class="btn secondary" id="inventory_find_btn" type="button" title="Find in Quartzy Inventory">🔎 Find</button>
+          </div>
+          <div id="inventory_match_status" class="hint"></div>
+        </div>
+        <input type="hidden" id="inventory_item_id" value="">
+        <div class="col-6" id="expected_wrap" style="display:none;">
+          <label>Expected / Received</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span id="expected_display" class="hint"></span>
+          </div>
+          <input type="hidden" id="expected_quantity" value="">
+        </div>
+        <div class="col-6">
+          <label>Status</label>
+          <select id="status">
+            <option>All Good</option>
+            <option>Completed With Conditions</option>
+            <option>Package Damaged</option>
+          </select>
+        </div>
+        <div class="col-6">
+          <label>Location</label>
+          <select id="location"></select>
+        </div>
+        <div class="col-6">
+          <label>Sub-Location</label>
+          <select id="sub_location"><option value="">Sub-Location</option></select>
+        </div>
+        <div class="col-6">
+          <label>Received By?</label>
+          <div class="actions">
+            <select id="received_by" style="min-width:220px"><option value="">Loading...</option></select>
+            <button class="btn secondary" id="refresh_employees" type="button" title="Refresh">🔄 Refresh</button>
+          </div>
+          <input type="hidden" id="received_by_id">
+        </div>
+        <div class="col-12">
+          <label>Comments</label>
+          <textarea id="comments" rows="3" placeholder="comments here"></textarea>
+        </div>
+        <div class="col-12">
+          <label>Add Pictures</label>
+          <div class="actions">
+            <button class="btn" id="btn_take" type="button">📷 Take Photos</button>
+            <button class="btn secondary" id="btn_gallery" type="button">🖼️ Add from Gallery</button>
+          </div>
+          <input id="pics" type="file" accept="image/*" capture="environment" multiple style="display:none">
+          <div class="hint" id="pics_status"></div>
+        </div>
+      </div>
+      <div class="actions"><button class="btn" id="submit_btn">Submit</button></div>
+      <div id="other_status" style="margin-top:12px; font-size:14px; line-height:1.4;"></div>
+    </div>
+  </div>
+
+  <!-- Global loading overlay -->
+  <div id="global_loading_overlay" style="position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(255,255,255,0.88);z-index:9999;flex-direction:column;">
+    <img src="/static/assets/allumiqs_segments_reveal.gif" alt="Loading" style="max-width:260px;width:40%;height:auto;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,.12));"/>
+    <div id="global_loading_status" class="spinner-text" style="margin-top:18px;font-size:16px;color:#00334f;">Preparing...</div>
+  </div>
+
+  <script>
+    // Add logos to item type buttons based on their image-url attributes
+    (function(){
+      try{
+        const buttons = document.querySelectorAll('#item_type_toggle .item-type-square');
+        buttons.forEach(btn => {
+          const url = btn.getAttribute('image-url');
+          if (!url) return;
+          // Avoid duplicate images if user reloaded scripts
+          if (btn.querySelector('img.item-type-logo')) return;
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = '';
+          img.className = 'item-type-logo';
+          // Insert image before the button text
+          btn.prepend(img);
+        });
+      }catch(e){}
+    })();
+
+    // Console debug helpers
+    window.DEBUG = true; // set to false to silence logs
+    function dbg(title, fn){ try{ if(!window.DEBUG) return; console.groupCollapsed('%c'+title,'color:#374151;font-weight:700'); if(typeof fn==='function'){ fn(); } console.groupEnd(); }catch{} }
+    function dbgTable(title, rows){ dbg(title, ()=>{ try{ if(Array.isArray(rows)) console.table(rows); else console.dir(rows);}catch{} }); }
+
+    // Overlay helpers
+    const overlayEl = document.getElementById('global_loading_overlay');
+    const overlayStatusEl = document.getElementById('global_loading_status');
+    function setOverlayState(state){ if(!overlayEl) return; overlayEl.classList.remove('success','warning','error'); if(state) overlayEl.classList.add(state); }
+    function showOverlay(txt){
+      if(overlayStatusEl && txt) overlayStatusEl.textContent = txt;
+      if(overlayEl){
+        try{ overlayEl.style.display = 'flex'; }catch{}
+        setOverlayState(null);
+        overlayEl.classList.add('visible');
+        // Ensure pointer events are enabled when visible
+        try{ overlayEl.style.pointerEvents = 'all'; }catch{}
+      }
+    }
+    function updateOverlay(txt){ if(overlayStatusEl && txt) overlayStatusEl.textContent = txt; }
+    function hideOverlay(delay=0){
+      if(!overlayEl) return;
+      const doHide = ()=>{
+        overlayEl.classList.remove('visible');
+        try{ overlayEl.style.pointerEvents = 'none'; }catch{}
+        try{ overlayEl.style.display = 'none'; }catch{}
+      };
+      if(delay && delay>0){ setTimeout(doHide, delay); } else { doHide(); }
+    }
+
+    // Watchdog: auto-hide overlay after 90s so UI never feels stuck
+    (function(){
+      let lastShown = 0; const _show = showOverlay;
+      showOverlay = function(txt){ lastShown = Date.now(); _show(txt); };
+      setInterval(()=>{
+        try{
+          if (overlayEl && overlayEl.classList.contains('visible')){
+            if (Date.now() - lastShown > 90000){
+              setOverlayState('warning');
+              updateOverlay('Still working… you can continue using the page.');
+              hideOverlay(800);
+            }
+          }
+        }catch{}
+      }, 2500);
+    })();
+
+    // fetch with timeout wrapper
+    async function fetchWithTimeout(url, opts={}, timeoutMs=30000){
+      const ctrl = new AbortController();
+      const t = setTimeout(()=> ctrl.abort('timeout'), timeoutMs);
+      try{
+        const r = await fetch(url, { ...(opts||{}), signal: ctrl.signal });
+        clearTimeout(t);
+        return r;
+      }catch(e){ clearTimeout(t); throw e; }
+    }
+
+    // Clipboard
+    function copyToClipboard(text){ if (!text) return; if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text)); } else { fallbackCopy(text); } }
+    function fallbackCopy(text){ try{ const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);}catch{} }
+
+    // Helper to render a status box
+    function setOtherStatus(html, cls=''){ const el = document.getElementById('other_status'); if(!el) return; el.className = cls || ''; el.innerHTML = html || ''; }
+
+    // Startup safety: ensure the global overlay is not left visible on initial load
+    // Prefer DOMContentLoaded so we don't wait for all images/assets to finish loading.
+    function _earlyHide(){ try{ hideOverlay(0); }catch{} }
+    document.addEventListener('DOMContentLoaded', _earlyHide);
+    window.addEventListener('load', _earlyHide);
+    // Secondary guard: if for any reason it becomes visible again without user action, hide after a short delay
+    setTimeout(_earlyHide, 1500);
+    // First paint guard: try on next frame as well
+    try{ requestAnimationFrame(_earlyHide); }catch{}
+
+    // Startup diagnostics: ping backend health and surface quick status if unreachable/slow
+    (function(){
+      const bannerId = 'startup_status_banner';
+      function showBanner(text, level){
+        try{
+          let el = document.getElementById(bannerId);
+          if(!el){
+            el = document.createElement('div');
+            el.id = bannerId;
+            el.style.position = 'fixed'; el.style.left = '12px'; el.style.right = '12px'; el.style.bottom = '12px';
+            el.style.zIndex = '99999'; el.style.padding = '10px 14px'; el.style.borderRadius = '10px';
+            el.style.background = '#fff6e5'; el.style.border = '1px solid #ffd597'; el.style.color = '#5a3c00';
+            el.style.boxShadow = '0 6px 18px rgba(0,0,0,.12)'; el.style.fontSize = '14px';
+            document.body.appendChild(el);
+          }
+          const prefix = level==='error' ? 'Backend error' : (level==='warn' ? 'Backend slow' : 'Info');
+          el.innerHTML = `<strong>${prefix}:</strong> ${text}`;
+        }catch{}
+      }
+      // ping healthz quickly
+      try{
+        const start = Date.now();
+        fetchWithTimeout('/healthz', {}, 5000).then(r=>{
+          const ms = Date.now()-start;
+          if(!r.ok){ showBanner(`Health check failed (${r.status}). Continuing with UI.`, 'warn'); }
+          else if(ms>1500){ showBanner(`Server responded slowly (${ms}ms). You can still use the UI.`, 'warn'); }
+        }).catch(()=>{
+          showBanner('Cannot reach backend (timeout). UI will still load but server features may be unavailable.', 'error');
+        }).finally(()=>{ try{ hideOverlay(0); }catch{} });
+      }catch(_){ /* ignore */ }
+      // Global JS error surface so failures don't look like infinite loading
+      try{
+        window.addEventListener('error', function(ev){
+          const msg = (ev && ev.message) ? String(ev.message) : 'Unknown script error';
+          showBanner(`Script error: ${msg}`, 'error');
+        });
+        window.addEventListener('unhandledrejection', function(ev){
+          const msg = (ev && ev.reason) ? String(ev.reason) : 'Unhandled promise rejection';
+          showBanner(`Runtime error: ${msg}`, 'error');
+        });
+      }catch(_){ }
+    })();
+
+    // Build a prefilled Quartzy Add Item link (use reliable inventory root path)
+    function buildQuartzyAddLink(){
+      const base = 'https://app.quartzy.com/inventory';
+      const params = {
+        name: document.getElementById('item_name')?.value?.trim() || undefined,
+        vendor: document.getElementById('supplier')?.value?.trim() || undefined,
+        catalog_number: document.getElementById('catalog_number')?.value?.trim() || undefined,
+        location: document.getElementById('location')?.value || undefined,
+      };
+      const clean = Object.fromEntries(Object.entries(params).filter(([k,v])=> v));
+      const q = new URLSearchParams(clean).toString();
+      return q ? `${base}?${q}` : base;
+    }
+
+    // Return multiple variants to help debug open failures (SPA route differences)
+    function buildQuartzyAddLinkVariants(){
+      const groupId = (window._quartzyGroupId || '').toString().trim();
+      const baseDefault = 'https://app.quartzy.com/inventory';
+      const baseGroup = groupId ? `https://app.quartzy.com/groups/${groupId}/inventory` : '';
+      const baseDefaultNew = 'https://app.quartzy.com/inventory/new';
+      const baseGroupNew = groupId ? `https://app.quartzy.com/groups/${groupId}/inventory/new` : '';
+      const params = {
+        name: document.getElementById('item_name')?.value?.trim() || undefined,
+        vendor: document.getElementById('supplier')?.value?.trim() || undefined,
+        catalog_number: document.getElementById('catalog_number')?.value?.trim() || undefined,
+        location: document.getElementById('location')?.value || undefined,
+      };
+      const clean = Object.fromEntries(Object.entries(params).filter(([k,v])=> v));
+      const q = new URLSearchParams(clean).toString();
+      const def = q ? `${baseDefault}?${q}` : baseDefault;
+      const grp = baseGroup ? (q ? `${baseGroup}?${q}` : baseGroup) : '';
+      const defNew = q ? `${baseDefaultNew}?${q}` : baseDefaultNew;
+      const grpNew = baseGroupNew ? (q ? `${baseGroupNew}?${q}` : baseGroupNew) : '';
+      return { default: def, group: grp, default_no_query: baseDefault, group_no_query: baseGroup, default_new: defNew, group_new: grpNew, default_new_no_query: baseDefaultNew, group_new_no_query: baseGroupNew, params: clean, groupId };
+    }
+
+    // Remember which Add-link variant worked last (local preference)
+    function getPreferredAddVariant(){
+      try { return localStorage.getItem('quartzyAddVariant') || 'default'; } catch { return 'default'; }
+    }
+    function setPreferredAddVariant(key){
+      try { if (key) localStorage.setItem('quartzyAddVariant', key); } catch {}
+    }
+    function pickAddLink(variants, prefKey){
+      // If user explicitly picked a variant (not the implicit 'default'), use it
+      const explicitPref = prefKey && prefKey !== 'default' ? prefKey : null;
+      const order = [];
+      if (explicitPref) order.push(explicitPref);
+      const preferNew = !!window._quartzyPreferNewForm;
+      // Smart default order: prefer explicit 'new' forms when configured, else group root first
+      if (variants.groupId) {
+        if (preferNew) {
+          order.push('group_new');
+        } else {
+          order.push('group');
+        }
+        order.push('group_no_query');
+      }
+      // Then defaults, respecting preferNew
+      if (preferNew) {
+        order.push('default_new');
+      } else {
+        order.push('default');
+      }
+      order.push('default_no_query');
+      // Also include pure 'new (no query)' variants if present, put earlier if preferNew
+      if (preferNew) {
+        order.unshift('group_new_no_query','default_new_no_query');
+      } else {
+        order.push('group_new_no_query','default_new_no_query');
+      }
+      for (const k of order){ if (variants[k]) return { url: variants[k], key: k }; }
+      // Last resort fallbacks
+      for (const k of ['default','group','default_no_query','group_no_query']){ if (variants[k]) return { url: variants[k], key: k }; }
+      return { url: 'https://app.quartzy.com/inventory', key: 'default' };
+    }
+
+    // Build a bookmarklet script that opens Quartzy's Add form and prefills fields
+    function generateQuartzyAddHelperScript(){
+      const vals = {
+        name: document.getElementById('item_name')?.value?.trim() || '',
+        vendor: document.getElementById('supplier')?.value?.trim() || '',
+        catalog_number: document.getElementById('catalog_number')?.value?.trim() || ''
+      };
+      const esc = (s)=> String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+      const code = `(
+        function(){try{
+          var vals={name:"${esc(vals.name)}",vendor:"${esc(vals.vendor)}",catalog_number:"${esc(vals.catalog_number)}"};
+          var clickAdd=function(){
+            var labels=['Add Item','Add item','New Item','Add to Inventory','Add to inventory','Add'];
+            var list=Array.prototype.slice.call(document.querySelectorAll('button,[role=button],a'));
+            var btn=list.find(function(b){var t=(b.innerText||b.textContent||'').trim(); return labels.some(function(l){return t===l;}) || /\\+\\s*(New|Add)/i.test(t);});
+            if(btn){ btn.click(); return true; }
+            return false;
+          };
+          var fill=function(){
+            var q=function(s){return document.querySelector(s)};
+            var set=function(el,val){ if(!el) return; try{ el.focus(); var d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value'); if(d&&d.set){ d.set.call(el,val);} else { el.value=val; } el.dispatchEvent(new Event('input',{bubbles:true})); el.blur(); }catch(_){} };
+            set(q('input[name="name"],input[placeholder*="name" i]'), vals.name);
+            set(q('input[name="vendor"],input[placeholder*="vendor" i]'), vals.vendor);
+            set(q('input[name*="catalog" i],input[placeholder*="catalog" i]'), vals.catalog_number);
+          };
+          if(!clickAdd()){
+            alert('Helper: click the “Add Item” button in Quartzy, then run the helper again to prefill.');
+          } else { setTimeout(fill, 1200); }
+        }catch(e){ alert('Helper error: '+e); }}
+      )();`;
+      // Minify a bit to keep bookmarklet short
+      return code.replace(/\n+/g,' ').replace(/\s{2,}/g,' ');
+    }
+
+    // Append a UI block with a bookmarklet and console script copy to a container element
+    function appendQuartzyHelperUI(container){
+      try{
+        if(!container) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'hint';
+        wrap.style.marginTop = '8px';
+        const a = document.createElement('a');
+        a.className = 'btn secondary';
+        a.textContent = 'Quartzy Add Helper (bookmarklet)';
+        const code = generateQuartzyAddHelperScript();
+        a.href = 'javascript:' + code; // for dragging to bookmarks bar
+        a.title = 'Drag this to your bookmarks bar. Then click it in the Quartzy tab to open and prefill the Add form.';
+        a.addEventListener('click', (e)=>{ e.preventDefault(); alert('Tip: drag this button to your bookmarks bar, then click it while on app.quartzy.com to open/prefill the Add form.'); });
+        const btn = document.createElement('button');
+        btn.className = 'btn secondary';
+        btn.textContent = 'Copy Console Script';
+        btn.style.marginLeft = '8px';
+        btn.addEventListener('click', ()=>{ try{ copyToClipboard(code); alert('Copied! Switch to the Quartzy tab, open DevTools (F12), paste into Console, press Enter.'); }catch{} });
+        const p = document.createElement('div');
+        p.style.marginTop = '6px';
+        p.textContent = 'If the Add form doesn\'t open automatically, use the helper:';
+        wrap.appendChild(p);
+        wrap.appendChild(a);
+        wrap.appendChild(btn);
+        container.appendChild(wrap);
+      }catch{}
+    }
+
+    // Item type toggle
+    document.getElementById('item_type_toggle').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.item-type-square'); if(!btn) return;
+      [...document.querySelectorAll('#item_type_toggle .item-type-square')].forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected'); const v = btn.dataset.value;
+      dbg('Item Type Toggle', ()=>{ console.log('Selected:', v); });
+      document.getElementById('samples_form').style.display = (v==='Samples')? '': 'none';
+      document.getElementById('other_form').style.display = (v==='Other')? '': 'none';
+      if (v==='Other') { loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations(); }
+      if (v==='Samples') { loadSamplesProjects(); }
+    });
+
+    // Employees
+    let _employeesCache = null;
+    async function loadEmployees(dropdownId){
+      const sel = document.getElementById(dropdownId); if(!sel) return;
+      if(_employeesCache){ renderEmployees(sel,_employeesCache); return; }
+      sel.innerHTML = '<option value="">Loading...</option>';
+      try{
+  const r = await fetchWithTimeout('/api/employees', {}, 20000);
+        const d = await r.json();
+        _employeesCache = d;
+        dbg('Employees Loaded', ()=>{
+          const rows = (d.members||[]).map(m=>({ id:m.id, name:(m.name||m.username||m.email||'').toString() }));
+          console.log('Count:', rows.length);
+          if(rows.length) console.table(rows);
+        });
+        renderEmployees(sel,d);
+      }catch(e){ sel.innerHTML = '<option value="">Failed to load</option>'; }
+    }
+    function renderEmployees(select, data){ select.innerHTML = '<option value="">Select</option>'; (data.members||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.name||m.username||m.email||m.id; select.appendChild(o); }); }
+
+    // Photos quick UI
+    document.addEventListener('click', function(e){ if (e.target && e.target.id === 'btn_take'){ const input=document.getElementById('pics'); if(input){ input.setAttribute('capture','environment'); input.removeAttribute('webkitdirectory'); input.click(); }} if (e.target && e.target.id === 'btn_gallery'){ const input=document.getElementById('pics'); if(input){ input.removeAttribute('capture'); input.removeAttribute('webkitdirectory'); input.click(); }}});
+  document.addEventListener('change', function(e){ if (e.target && e.target.id === 'pics'){ const st=document.getElementById('pics_status'); const files = e.target.files ? e.target.files.length : 0; st.textContent = files ? `${files} picture${files>1?'s':''} selected.` : ''; dbg('Photos Selected', ()=>{ const arr=[...(e.target.files||[])].map(f=>({name:f.name,type:f.type,size:f.size})); if(arr.length) console.table(arr); }); }});
+
+    // Quartzy locations
+    async function initQuartzyLocations(){
+      try {
+  const resp = await fetchWithTimeout('/api/quartzy/lab/locations', {}, 25000); if(!resp.ok) return;
+  const res = await resp.json(); window._quartzyLabLocationMeta = res || {};
+  // Expose a group id for app URLs (Quartzy often uses the lab id as group id)
+  try {
+    // Prefer explicit group_id when provided; fall back to lab_id
+    if (res && (res.group_id || res.lab_id)) {
+      window._quartzyGroupId = (res.group_id || res.lab_id);
+    }
+    // UI preference: hard-prefer the explicit "new" form routes
+    if (res && Object.prototype.hasOwnProperty.call(res,'prefer_new_form')){
+      window._quartzyPreferNewForm = !!res.prefer_new_form;
+    }
+  } catch(_){ }
+        dbg('Quartzy Locations Loaded', ()=>{ console.log('Lab ID:', res.lab_id||'(none)'); console.log('Locations:', (res.locations||[]).length); });
+        const locEl = document.getElementById('location'); const subEl = document.getElementById('sub_location');
+        const locs = res.locations || [];
+        locEl.innerHTML = '<option value="">Location</option>' + locs.map(l=>`<option>${l}</option>`).join('');
+        locEl.addEventListener('change',()=>{
+          const subs = (res.location_to_sublocations||{})[locEl.value]||[];
+          dbg('Sub-Locations Change', ()=>{ console.log('Location:', locEl.value, 'Subs:', subs.length); });
+          subEl.innerHTML = '<option value="">Sub-Location</option>' + subs.map(s=>`<option>${s}</option>`).join('');
+        });
+      } catch(e){}
+    }
+
+    // Load ORDERED orders
+    let _quartzyOrdersCache = null;
+    async function loadQuartzyOrders(){
+      const sel=document.getElementById('quartzy_order'); if(!sel) return;
+      sel.innerHTML = '<option value="">Loading...</option>';
+      try{
+        const statuses=['ORDERED'];
+        const url=`/api/quartzy/orders?fast=1&statuses=${encodeURIComponent(statuses.join(','))}`;
+        dbg('Load Quartzy Orders', ()=>{ console.log('GET', url); });
+  const r = await fetchWithTimeout(url, {}, 25000);
+        const d = await r.json();
+        _quartzyOrdersCache = d.orders || [];
+        dbg('Quartzy Orders Loaded', ()=>{
+          console.log('Count:', _quartzyOrdersCache.length);
+          if(_quartzyOrdersCache.length){
+            const sample=_quartzyOrdersCache.slice(0,10).map(o=>({id:o.id,name:o.name,vendor:o.vendor,catalog:o.catalog_number,status:o.status}));
+            console.table(sample);
+          }
+        });
+        sel.innerHTML = '<option value="">Select Order Request</option>' + _quartzyOrdersCache.map(o=>{
+          const title = [`Vendor: ${o.vendor||''}`, `Cat#: ${o.catalog_number||''}`, `Status: ${o.status||''}`].filter(Boolean).join('  •  ');
+          return `<option value="${o.id}" title="${title}" data-obj='${JSON.stringify(o).replace(/'/g,"&#39;")}' >${o.name||''}</option>`;
+        }).join('');
+      } catch(e){ sel.innerHTML='<option value="">Failed to load</option>'; }
+    }
+
+    // On order select
+    document.addEventListener('change', async (e)=>{
+      if(e.target && e.target.id==='quartzy_order'){
+        const opt = e.target.options[e.target.selectedIndex]; if(!opt || !opt.value) return;
+        let obj=null; try{ obj = opt.getAttribute('data-obj'); if(obj) obj = JSON.parse(obj.replace(/&#39;/g,"'")); }catch{}
+        if(obj){
+          window._lastSelectedOrder = obj; dbg('Order Selected', ()=>{ console.dir(obj); });
+          document.getElementById('item_name').value = obj.name||'';
+          document.getElementById('supplier').value = obj.vendor||'';
+          document.getElementById('catalog_number').value = obj.catalog_number||'';
+          const expectedEl = document.getElementById('expected_quantity');
+          const expectedWrap = document.getElementById('expected_wrap');
+          const expectedDisplay = document.getElementById('expected_display');
+          expectedEl.value = obj.quantity_expected || '';
+          expectedWrap.style.display = obj.quantity_expected? '': 'none';
+          expectedDisplay.textContent = obj.quantity_expected? `${obj.quantity_expected} expected`: '';
+          // Update inline fraction next to Number of Items
+          const frac = document.getElementById('quantity_fraction');
+          if (frac){
+            if (obj.quantity_expected){ frac.textContent = `/ ${obj.quantity_expected}`; frac.style.display = ''; }
+            else { frac.textContent = ''; frac.style.display = 'none'; }
+          }
+          const qtyEl = document.getElementById('quantity'); if (qtyEl && obj.quantity_expected) qtyEl.value = obj.quantity_expected;
+          // Auto-run inventory candidate search if we have a catalog number
+          const cat = (document.getElementById('catalog_number')?.value||'').trim();
+          if (cat) { try{ findInventoryCandidates(); }catch{} }
+        }
+      }
+    });
+
+    // Inventory Find and candidate selection
+    let _lastInventoryCandidates = [];
+    async function findInventoryCandidates(){
+      const name = document.getElementById('item_name')?.value?.trim() || '';
+      const vendor = document.getElementById('supplier')?.value?.trim() || '';
+      const catalog = document.getElementById('catalog_number')?.value?.trim() || '';
+      const lab_id = (window._quartzyLabLocationMeta && window._quartzyLabLocationMeta.lab_id) || '';
+      const statusEl = document.getElementById('inventory_match_status');
+      const hiddenIdEl = document.getElementById('inventory_item_id');
+      if (statusEl) statusEl.textContent = 'Searching…';
+      if (hiddenIdEl) hiddenIdEl.value = '';
+      try{
+        const payload = { item_name: name || undefined, vendor_name: vendor || undefined, catalog_number: catalog || undefined, lab_id: lab_id || undefined };
+        if (typeof dbg === 'function') dbg('Inventory Find (Request)', ()=>{ console.dir(payload); });
+  const resp = await fetchWithTimeout('/api/quartzy/inventory/find?auto_add_if_not_found=0', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }, 25000);
+        const data = await resp.json();
+        window._lastInventoryFind = data;
+        // Log backend search debug to console
+        try{
+          const invDbg = (data && data.debug && data.debug.inventory) ? data.debug.inventory : null;
+          if (invDbg){
+            dbg('[Inventory Find Debug]', ()=>{
+              console.log('lab_id_used:', invDbg.lab_id_used);
+              console.log('endpoint_selected:', invDbg.endpoint_selected);
+              if (Array.isArray(invDbg.endpoint_attempts)){
+                const rows = invDbg.endpoint_attempts.map(a=>({ endpoint:a.endpoint, with_lab_id:!!a.with_lab_id, status:a.status, ok:a.ok, exception:a.exception }));
+                if(rows.length) console.table(rows);
+              }
+              console.log('fetch_config:', invDbg.fetch_config);
+            });
+          }
+        }catch{}
+        const list = Array.isArray(data?.candidates) ? data.candidates : [];
+        _lastInventoryCandidates = list;
+        renderInventoryCandidates(list);
+        if (typeof dbg === 'function') dbg('Inventory Find (Response)', ()=>{ console.log('Count:', list.length); if(list.length){ console.table(list.map(c=>({id:c.id,name:c.item_name,vendor:c.vendor_name,catalog:c.catalog_number,score:c.score,location:c.location,sub:c.sub_location}))); } });
+      }catch(e){ if(statusEl) statusEl.textContent = 'Search failed.'; }
+    }
+
+    function renderInventoryCandidates(list){
+      const statusEl = document.getElementById('inventory_match_status');
+      if (!statusEl) return;
+      // Apply score threshold: hide matches under 75
+      const filtered = (list||[]).filter(c => (c && (c.score||0) >= 75));
+      if (!filtered.length){
+        const htmlNo = [
+          '<div style="color:#6b7280;">No high-confidence candidates (score ≥ 75).</div>',
+          '<div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">',
+          '<a class="btn" href="#" id="btn_open_add_link">Open Add Item (prefilled)</a>',
+          '</div>'
+        ].join('');
+        statusEl.innerHTML = htmlNo;
+        // Prefilled add-link
+        const variants = buildQuartzyAddLinkVariants();
+        const pick = pickAddLink(variants, getPreferredAddVariant());
+        const link = pick.url;
+        const a = document.getElementById('btn_open_add_link');
+        if (a) { a.href = link; a.target = '_blank'; a.rel = 'noopener'; }
+        // Inline debug helper (collapsed style)
+        try{
+          const dbgDiv = document.createElement('div');
+          dbgDiv.className = 'hint';
+          dbgDiv.style.marginTop = '6px';
+          dbgDiv.innerHTML = `
+            <details>
+              <summary>Add-link debug</summary>
+              <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                ${variants.group_new ? `<a class=\"btn secondary\" data-variant=\"group_new\" href=\"${variants.group_new}\" target=\"_blank\" rel=\"noopener\">Open Group (new)</a>` : ''}
+                <a class="btn secondary" data-variant="default_new" href="${variants.default_new}" target="_blank" rel="noopener">Open Default (new)</a>
+                <a class="btn secondary" data-variant="default" href="${variants.default}" target="_blank" rel="noopener">Open Default</a>
+                ${variants.group ? `<a class=\"btn secondary\" data-variant=\"group\" href=\"${variants.group}\" target=\"_blank\" rel=\"noopener\">Open Group</a>` : ''}
+                <a class="btn secondary" data-variant="default_no_query" href="${variants.default_no_query}" target="_blank" rel="noopener">Open Default (no query)</a>
+                ${variants.group_no_query ? `<a class=\"btn secondary\" data-variant=\"group_no_query\" href=\"${variants.group_no_query}\" target=\"_blank\" rel=\"noopener\">Open Group (no query)</a>` : ''}
+              </div>
+              <pre style="background:#f3f4f6;padding:8px;border-radius:8px;white-space:pre-wrap;word-break:break-all;margin-top:6px;">${
+                JSON.stringify({attempted: variants.default, groupId: variants.groupId, params: variants.params}, null, 2)
+              }</pre>
+            </details>`;
+          statusEl.appendChild(dbgDiv);
+          // Search debug (selected endpoint, attempts, config) with copy button
+          try{
+            const invDbg = (window._lastInventoryFind && window._lastInventoryFind.debug && window._lastInventoryFind.debug.inventory) ? window._lastInventoryFind.debug.inventory : null;
+            if (invDbg){
+              const sdiv = document.createElement('div');
+              sdiv.className = 'hint';
+              sdiv.style.marginTop = '6px';
+              const summary = {
+                lab_id_used: invDbg.lab_id_used || '',
+                selected: invDbg.endpoint_selected ? { endpoint: invDbg.endpoint_selected.endpoint, status: invDbg.endpoint_selected.status, with_lab_id: invDbg.endpoint_selected.with_lab_id } : null,
+                attempts: Array.isArray(invDbg.endpoint_attempts) ? invDbg.endpoint_attempts.slice(0,6).map(a=>({ endpoint:a.endpoint, status:a.status, ok:a.ok, ex:a.exception })) : [],
+                fetch_config: invDbg.fetch_config || null,
+              };
+              sdiv.innerHTML = `
+                <details>
+                  <summary>Search debug</summary>
+                  <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <button type="button" class="btn secondary" id="btn_copy_search_debug">Copy Search Debug</button>
+                  </div>
+                  <pre style="background:#f3f4f6;padding:8px;border-radius:8px;white-space:pre-wrap;word-break:break-all;margin-top:6px;">${
+                    JSON.stringify(summary, null, 2)
+                  }</pre>
+                </details>`;
+              statusEl.appendChild(sdiv);
+              document.getElementById('btn_copy_search_debug')?.addEventListener('click', ()=>{
+                try{ copyToClipboard(JSON.stringify(invDbg, null, 2)); }catch{}
+              });
+            }
+          }catch{}
+          // Offer a bookmarklet to open/prefill Add form directly in Quartzy
+          appendQuartzyHelperUI(statusEl);
+          dbg('Add-link Variants', ()=>{ console.dir(variants); });
+        }catch{}
+        return;
+      }
+      const html = ['<div style="margin-top:6px;">Candidates (score ≥ 75):</div>','<div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">']
+        .concat(filtered.slice(0,5).map((c,i)=>{
+          const title = [c.item_name||'', c.vendor_name?`Vendor: ${c.vendor_name}`:'', c.catalog_number?`Cat#: ${c.catalog_number}`:'', `Score: ${c.score||0}`, (c.location||c.sub_location)?`Loc: ${[c.location,c.sub_location].filter(Boolean).join(' / ')}`:'' ].filter(Boolean).join('  •  ');
+          return `<button type=\"button\" class=\"btn secondary\" data-cand-index=\"${i}\" title=\"${title}\" style=\"justify-content:flex-start;\">${c.item_name||'(no name)'}${c.catalog_number?`  •  ${c.catalog_number}`:''}  <span style=\"opacity:.7; margin-left:auto;\">${c.score||0}</span></button>`;
+        }))
+        .concat(['</div>']).join('');
+      statusEl.innerHTML = html;
+      statusEl.querySelectorAll('button[data-cand-index]')?.forEach(btn=>{
+        btn.addEventListener('click', ()=>{ const idx = parseInt(btn.getAttribute('data-cand-index')||'-1',10); if(isNaN(idx)||idx<0||idx>=filtered.length) return; const c = filtered[idx]; applyInventorySelection(c); });
+      });
+    }
+
+    function applyInventorySelection(c){
+      const hiddenIdEl = document.getElementById('inventory_item_id');
+      const locEl = document.getElementById('location');
+      const subEl = document.getElementById('sub_location');
+      if (hiddenIdEl) hiddenIdEl.value = c?.id || '';
+      if (c && (c.location || c.sub_location)){
+        if (locEl && c.location){
+          const match = [...locEl.options].find(o=> (o.value||o.textContent) === c.location);
+          if (match) locEl.value = match.value || match.textContent;
+          locEl.dispatchEvent(new Event('change'));
+        }
+        if (subEl && c.sub_location){
+          const opt = [...subEl.options].find(o=> (o.value||o.textContent) === c.sub_location);
+          if (opt) subEl.value = opt.value || opt.textContent;
+        }
+      }
+      const statusEl = document.getElementById('inventory_match_status');
+      if (statusEl){ statusEl.innerHTML = `<span style=\"color:#056d41;\">Matched item selected ✔️</span> <span style=\"opacity:.7;\">(ID: ${c?.id||'?'} )</span>`; }
+    }
+
+    // Bind Find button and Enter key in Catalog field
+    document.getElementById('inventory_find_btn')?.addEventListener('click', ()=>{ findInventoryCandidates(); });
+    document.getElementById('catalog_number')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); findInventoryCandidates(); } });
+
+    // Submit Other form
+    const otherSubmitBtn = document.getElementById('submit_btn');
+    otherSubmitBtn.addEventListener('click', async ()=>{
+      // Pre-open a blank tab to bypass popup blockers; navigate it only if needed
+      let preTab = null;
+      try {
+        preTab = window.open('about:blank', '_blank');
+        // Optional: light placeholder so users know it's intentional
+        if (preTab && preTab.document) {
+          preTab.document.write('<!doctype html><title>Quartzy Add (standby)</title><body style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:20px;color:#00334f;">Waiting for submission…</body>');
+          preTab.document.close();
+        }
+      } catch (_) { /* ignored */ }
+  const orderId = document.getElementById('quartzy_order')?.value || '';
+      const itemName = document.getElementById('item_name')?.value?.trim() || '';
+      const quantity = document.getElementById('quantity')?.value || '';
+      const supplier = document.getElementById('supplier')?.value?.trim() || '';
+      const storage = document.getElementById('status')?.value || '';
+      const locationVal = document.getElementById('location')?.value || '';
+      const subLoc = document.getElementById('sub_location')?.value || '';
+      const received_by = document.getElementById('received_by')?.options[document.getElementById('received_by').selectedIndex]?.textContent || '';
+      const received_by_id = document.getElementById('received_by')?.value || '';
+      const comments = document.getElementById('comments')?.value || '';
+      const expectedQty = document.getElementById('expected_quantity')?.value || '';
+  if (!orderId) return alert('Select an Order Request');
+  if (!itemName) return alert('Enter item name');
+      showOverlay('Submitting reception to server...');
+      const otherPics = await uploadSelectedPictures('pics');
+      const payload = new URLSearchParams({
+        form_type: 'other', item_name: itemName, quantity,
+        supplier, catalog_number: document.getElementById('catalog_number')?.value || '',
+        inventory_item_id: document.getElementById('inventory_item_id')?.value || '',
+        item_type: 'Other', project_manager: '', bsl2_status: '', status: storage,
+        storage_location: locationVal, location: locationVal, sub_location: subLoc,
+        received_by, received_by_id, comments, pictures: otherPics.join(','), order_id: orderId, expected_quantity: expectedQty
+      });
+      try{
+        // Preview payload being submitted
+  const dbgPayloadPreview = { form_type:'other', item_name:itemName, quantity, supplier, catalog_number: document.getElementById('catalog_number')?.value || '', inventory_item_id: document.getElementById('inventory_item_id')?.value || '', item_type:'Other', status: storage, location: locationVal, sub_location: subLoc, received_by, received_by_id, comments, order_id: orderId, expected_quantity: expectedQty, pictures: otherPics };
+        dbg('Submitting Reception (Preview)', ()=>{ console.dir(dbgPayloadPreview); });
+  const resp = await fetchWithTimeout('/api/submit', { method:'POST', body: payload }, 60000);
+        let txt = await resp.text(); let data=null; try{ data = txt? JSON.parse(txt) : null; }catch{}
+        if(!resp.ok){ setOtherStatus(`<span style='color:#b30000;'>Submit failed</span> <code>${(txt||'').slice(0,200)}</code>`); setOverlayState('error'); hideOverlay(500); return; }
+        // Post-submit panels
+        const inv = data?.quartzy_inventory || {}; const qz = data?.quartzy || {};
+        try{ window._lastInventoryUpdate = inv; window._lastQuartzyStatus = qz; }catch{}
+        // Console diagnostics
+        try{
+          if(Array.isArray(inv.attempts)&&inv.attempts.length){ dbgTable('[Quartzy Inventory Update Attempts]', inv.attempts.map(a=>({method:a.method,url:a.url,status:a.status,ok:a.ok,body_shape:Array.isArray(a.body_shape)?a.body_shape.join(','):a.body_shape, resp_snippet:a.resp_snippet?String(a.resp_snippet).slice(0,120):''}))); }
+          if(inv._quantity_update_debug){ dbg('[Inventory Quantity Update]', ()=>{ console.log(inv._quantity_update_debug); }); }
+          if(qz && Array.isArray(qz.attempts) && qz.attempts.length){ dbgTable('[Quartzy Order Status Update Attempts]', qz.attempts.map(a=>({method:a.method,url:a.url,status:a.status,ok:a.ok,body_shape:Array.isArray(a.body_shape)?a.body_shape.join(','):a.body_shape, resp_snippet:a.resp_snippet?String(a.resp_snippet).slice(0,120):''}))); }
+        }catch{}
+        let qzLine = '';
+          if (qz && typeof qz==='object'){
+          if (qz.partial){
+            const msg = qz.ui_message || `Partial Reception ${qz.received_qty ?? '?'}/${qz.ordered_qty ?? '?'}`;
+            // Base partial message
+            qzLine = `<span style=\"color:#b58900;\">${msg}</span>`;
+            // Inline hint/confirmation about order adjust job if applicable
+            try{
+              if (Object.prototype.hasOwnProperty.call(qz,'order_adjust_started')){
+                if (qz.order_adjust_started && qz.order_adjust_op_id){
+                  qzLine += ` <span class=\"hint\" style=\"margin-left:6px;\">(Adjusting expected quantity via UI… ${qz.order_adjust_op_id})</span>`;
+                } else if (!qz.order_adjust_started && qz.order_adjust_error){
+                  const em = String(qz.order_adjust_error||'').slice(0,80);
+                  qzLine += ` <span class=\"hint\" style=\"color:#b58900;margin-left:6px;\">Order adjust not started${em?`: ${em}`:''}</span>`;
+                } else if (!qz.order_adjust_started && !Object.prototype.hasOwnProperty.call(qz,'order_adjust_error')){
+                  // API mode path: no job started and no explicit error => likely disabled (mode=api)
+                  qzLine += ` <span class=\"hint\" style=\"color:#6b7280;margin-left:6px;\">(Auto adjust disabled; switch to UI mode to update expected quantity)</span>`;
+                }
+              }
+            }catch(_){/* no-op */}
+            // Add a confirmation display when API-only path updated the order (notes)
+            try{
+              const notes = qz.notes_update;
+              if (notes && typeof notes === 'object'){
+                if (notes.updated){
+                  qzLine += ` <span class=\"hint\" style=\"color:#056d41;margin-left:6px;\">Order updated (notes) via PUT ✅</span>`;
+                } else if (notes.error || Array.isArray(notes.attempts)){
+                  const em = String(notes.error || '').slice(0,80);
+                  qzLine += ` <span class=\"hint\" style=\"color:#b58900;margin-left:6px;\">Order update not confirmed${em? `: ${em}`:''}</span>`;
+                }
+              }
+            }catch(_){/* no-op */}
+          } else if (qz.updated){
+            qzLine = '<span style="color:#056d41;">Quartzy Order Status: RECEIVED ✅</span>';
+          } else if (qz.error){
+            qzLine = `<span style=\"color:#b30000;\">Quartzy Order Status: ❌ ${String(qz.error).slice(0,140)}</span>`;
+          } else if (Array.isArray(qz.attempts)){
+            qzLine = `<span style=\"color:#b58900;\">Quartzy Order Status: attempted (${qz.attempts.length})</span>`;
+          }
+        }
+        const invUpdated = !!(inv && (inv.updated || inv.found || inv.matched === true));
+        if (invUpdated){
+          // Separate cards: Order Request and Inventory
+          const orderCard = (()=>{
+            const showDebug = '<a href="#" id="qz_show_debug" style="margin-left:8px;">Show Debug</a>';
+            const copyDebug = '<button type="button" class="btn secondary" id="qz_copy_debug" style="padding:4px 8px;margin-left:6px;">Copy Debug</button>';
+            const inner = `${qzLine ? `<div style=\"margin-bottom:6px;\">${qzLine} ${showDebug} ${copyDebug}</div>` : '<div class="hint">No order changes were requested.</div>'}`;
+            return `<div id="order_status_card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb; margin-bottom:8px;">`
+              + `<div style="font-weight:600; margin-bottom:6px;">Order Request</div>`
+              + inner
+              + `</div>`;
+          })();
+          const invLine = inv.updated ? '<span style="color:#056d41;">Inventory updated ✅</span>' : (inv.error? `<span style=\"color:#b30000;\">Inventory update ❌ ${(String(inv.error)||'').slice(0,140)}</span>` : (Array.isArray(inv.attempts)? `<span style=\"color:#b58900;\">Inventory update attempted (${inv.attempts.length})</span>` : ''));
+          const methodPath = (inv.method && inv.path) ? `<span style=\"font-size:11px;color:#555;\"> (${inv.method} ${inv.path})</span>` : '';
+          const openBtn = inv.item_url ? `<a href=\"${inv.item_url}\" target=\"_blank\" rel=\"noopener\" class=\"btn\">Open Item in Quartzy</a>` : '';
+          const invCard = `<div id="inventory_status_card" style=\"padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;\">`
+            + `<div style=\"font-weight:600; margin-bottom:6px;\">Inventory</div>`
+            + `${invLine ? `<div style=\\"margin-bottom:6px;\\">${invLine}${methodPath}</div>` : ''}`
+            + `<div style=\"margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;\">${openBtn}
+                <a href=\"#\" id=\"inv_show_debug\" class=\"btn secondary\">Show Inventory Debug</a>
+                <button type=\"button\" class=\"btn secondary\" id=\"inv_copy_debug\">Copy Inventory Debug</button>
+               </div>`
+            + `</div>`;
+          setOtherStatus(orderCard + invCard);
+          // Close the standby tab since inventory is handled
+          try { if (preTab && !preTab.closed) preTab.close(); } catch(_){}
+          document.getElementById('inv_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Inventory Update Full Debug]','color:#0b7285;font-weight:700'); console.dir(window._lastInventoryUpdate||{}); console.groupEnd(); }catch{} });
+          document.getElementById('inv_copy_debug')?.addEventListener('click',()=>{ try{ const p=JSON.stringify(window._lastInventoryUpdate||{},null,2); copyToClipboard(p);}catch{} });
+          document.getElementById('qz_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Quartzy Full Debug]','color:#7c3aed;font-weight:700'); console.dir(window._lastQuartzyStatus||{}); console.groupEnd(); }catch{} });
+          document.getElementById('qz_copy_debug')?.addEventListener('click',()=>{ try{ const p=JSON.stringify(window._lastQuartzyStatus||{},null,2); copyToClipboard(p);}catch{} });
+          // If backend started a UI fallback job to update inventory quantity, surface status and poll
+          try{
+            if (inv && inv.ui_fallback_started && inv.ui_op_id){
+              const container = document.getElementById('inventory_status_card');
+              const secId = 'ui_update_status_'+String(inv.ui_op_id);
+              const sec = document.createElement('div');
+              sec.id = secId;
+              sec.style.marginTop = '8px';
+              sec.style.padding = '8px 10px';
+              sec.style.border = '1px dashed #d0d5dd';
+              sec.style.borderRadius = '10px';
+              sec.innerHTML = '<div style="font-weight:600;margin-bottom:4px;">UI Fallback</div>'
+                + '<div>Updating quantity in Quartzy via UI…</div>'
+                + (inv.ui_screenshot ? ` <div class="hint">A screenshot will appear here after it runs.</div>` : '');
+              container?.appendChild(sec);
+              const poll = async ()=>{
+                try{
+                  const rr = await fetch(`/api/quartzy/inventory/auto_update/status?op_id=${encodeURIComponent(inv.ui_op_id)}`);
+                  const dd = await rr.json();
+                  if (dd && dd.status){
+                    if (dd.success){
+                      const link = dd.item_url ? `<a href="${dd.item_url}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;">Open Item</a>` : '';
+                      sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">UI Fallback</div><div><span style=\"color:#056d41;\">Quantity updated via UI</span> ${link}</div>`;
+                      return;
+                    }
+                    if (["error","unknown"].includes(dd.status)){
+                      const shot = (dd.log||[]).find?.(x=>x.path && String(x.msg||'').includes('screenshot_saved'))?.path || inv.ui_screenshot || '';
+                      const shotLink = shot ? `<a class=\"btn secondary\" href=\"/${String(shot).replace(/^\/+/, '')}\" target=\"_blank\" rel=\"noopener\">View Screenshot</a>` : '';
+                      const dbgBtn = Array.isArray(dd.log) && dd.log.length ? `<button type=\"button\" class=\"btn secondary\" id=\"ui_upd_show_dbg\">Show Debug</button>` : '';
+                      const copyBtn = Array.isArray(dd.log) && dd.log.length ? `<button type=\"button\" class=\"btn secondary\" id=\"ui_upd_copy_dbg\">Copy Debug</button>` : '';
+                      sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">UI Fallback</div><div><span style=\"color:#b30000;\">UI quantity update failed</span> ${shotLink} ${dbgBtn} ${copyBtn}</div>`;
+                      document.getElementById('ui_upd_show_dbg')?.addEventListener('click', ()=>{ try{ console.group('%c[UI Update Debug Log]','color:#b00020;font-weight:700'); console.dir(dd); console.groupEnd(); }catch{} });
+                      document.getElementById('ui_upd_copy_dbg')?.addEventListener('click', ()=>{ try{ copyToClipboard(JSON.stringify(dd,null,2)); }catch{} });
+                      return;
+                    }
+                    sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">UI Fallback</div><div>Updating quantity in Quartzy via UI… <span class=\"hint\">(${dd.status})</span></div>`;
+                  }
+                }catch{}
+                setTimeout(poll, 1500);
+              };
+              poll();
+            }
+          }catch{}
+          // If backend started an Order Adjust job for partial reception, surface status and poll
+          try{
+            if (qz && qz.partial && Object.prototype.hasOwnProperty.call(qz,'order_adjust_started') && qz.order_adjust_started && qz.order_adjust_op_id){
+              const container = document.getElementById('order_status_card');
+              const secId = 'order_adjust_status_'+String(qz.order_adjust_op_id);
+              const sec = document.createElement('div');
+              sec.id = secId;
+              sec.style.marginTop = '8px';
+              sec.style.padding = '8px 10px';
+              sec.style.border = '1px dashed #d0d5dd';
+              sec.style.borderRadius = '10px';
+              const remText = (typeof qz.remaining_qty === 'number') ? `Remaining expected will be set to ${qz.remaining_qty}.` : '';
+              sec.innerHTML = '<div style="font-weight:600;margin-bottom:4px;">Order Adjust</div>'
+                + `<div>Adjusting order expected quantity via UI… <span class="hint">(${qz.order_adjust_op_id})</span></div>`
+                + (remText ? `<div class="hint" style="margin-top:4px;">${remText}</div>` : '')
+                + (qz.order_adjust_screenshot ? ` <div class="hint">A screenshot will appear here after it runs.</div>` : '');
+              container?.appendChild(sec);
+              const poll = async ()=>{
+                try{
+                  const url = qz.order_adjust_status_endpoint || (`/api/quartzy/order/adjust/status?op_id=${encodeURIComponent(qz.order_adjust_op_id)}`);
+                  const rr = await fetch(url);
+                  const dd = await rr.json();
+                  if (dd && dd.status){
+                    if (dd.success){
+                      const link = dd.app_url ? `<a href="${dd.app_url}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;">Open Order</a>` : '';
+                      sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div><span style=\"color:#056d41;\">Order expected quantity adjusted</span> ${link}</div>`;
+                      return;
+                    }
+                    if (["error","unknown"].includes(dd.status)){
+                      const shot = (dd.log||[]).find?.(x=>x.path && String(x.msg||'').includes('screenshot_saved'))?.path || qz.order_adjust_screenshot || '';
+                      const shotLink = shot ? `<a class=\"btn secondary\" href=\"/${String(shot).replace(/^\/+/,'')}\" target=\"_blank\" rel=\"noopener\">View Screenshot</a>` : '';
+                      const dbgBtn = Array.isArray(dd.log) && dd.log.length ? `<button type=\"button\" class=\"btn secondary\" id=\"ord_adj_show_dbg\">Show Debug</button>` : '';
+                      const copyBtn = Array.isArray(dd.log) && dd.log.length ? `<button type=\"button\" class=\"btn secondary\" id=\"ord_adj_copy_dbg\">Copy Debug</button>` : '';
+                      const reason = dd.error ? ` <span class=\"hint\">(${String(dd.error).slice(0,140)})</span>` : '';
+                      sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div><span style=\"color:#b30000;\">Order adjust failed</span>${reason} ${shotLink} ${dbgBtn} ${copyBtn}</div>`;
+                      document.getElementById('ord_adj_show_dbg')?.addEventListener('click', ()=>{ try{ console.group('%c[Order Adjust Debug Log]','color:#b00020;font-weight:700'); console.dir(dd); console.groupEnd(); }catch{} });
+                      document.getElementById('ord_adj_copy_dbg')?.addEventListener('click', ()=>{ try{ copyToClipboard(JSON.stringify(dd,null,2)); }catch{} });
+                      return;
+                    }
+                    sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div>Adjusting order via UI… <span class=\"hint\">(${dd.status})</span></div>`;
+                  }
+                }catch{}
+                setTimeout(poll, 1500);
+              };
+              poll();
+            } else if (qz && qz.partial && Object.prototype.hasOwnProperty.call(qz,'order_adjust_started') && !qz.order_adjust_started){
+              const container = document.getElementById('order_status_card');
+              const warn = document.createElement('div');
+              warn.style.marginTop = '8px';
+              warn.style.padding = '8px 10px';
+              warn.style.border = '1px dashed #d0d5dd';
+              warn.style.borderRadius = '10px';
+              const reason = qz.order_adjust_error ? ` (${String(qz.order_adjust_error).slice(0,140)})` : '';
+              warn.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div><span style=\"color:#b58900;\">Could not start order adjust job</span>${reason ? `<span class=\"hint\">${reason}</span>` : ''}</div>`;
+              container?.appendChild(warn);
+            }
+          }catch{}
+        } else {
+          const vals = { name: document.getElementById('item_name')?.value?.trim() || '', vendor: document.getElementById('supplier')?.value?.trim() || '', catalog: document.getElementById('catalog_number')?.value?.trim() || '', location: document.getElementById('location')?.value || '', subloc: document.getElementById('sub_location')?.value || '' };
+          const copyAll = [`Item Name: ${vals.name}`, `Vendor: ${vals.vendor}`, `Catalog #: ${vals.catalog}`, `Location: ${vals.location}`, `Sub-Location: ${vals.subloc}`].join('\n');
+          const orderCard = (()=>{
+            const showDebug = '<a href="#" id="qz_show_debug" style="margin-left:8px;">Show Debug</a>';
+            const copyDebug = '<button type="button" class="btn secondary" id="qz_copy_debug" style="padding:4px 8px;margin-left:6px;">Copy Debug</button>';
+            const inner = `${qzLine ? `<div style=\"margin-bottom:6px;\">${qzLine} ${showDebug} ${copyDebug}</div>` : '<div class="hint">No order changes were requested.</div>'}`;
+            return `<div id="order_status_card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb; margin-bottom:8px;">`
+              + `<div style="font-weight:600; margin-bottom:6px;">Order Request</div>`
+              + inner
+              + `</div>`;
+          })();
+          const variants = buildQuartzyAddLinkVariants();
+          const chosen = pickAddLink(variants, getPreferredAddVariant());
+          const html = orderCard + `<div id=\"inventory_status_card\" style=\"padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;\">`
+            + `<div style=\"font-weight:600; margin-bottom:6px;\">Inventory</div>`
+            + `<div style=\"margin-bottom:6px;\">Open Quartzy and paste the values:</div>`
+            + `<div style=\"display:grid;grid-template-columns: 1fr auto; gap:6px; align-items:center;\">`
+            + `<div><strong>Item Name:</strong> ${vals.name || '<em>(empty)</em>'}</div><button type=\"button\" class=\"btn secondary\" data-copy=\"${encodeURIComponent(vals.name)}\">Copy</button>`
+            + `<div><strong>Vendor:</strong> ${vals.vendor || '<em>(empty)</em>'}</div><button type=\"button\" class=\"btn secondary\" data-copy=\"${encodeURIComponent(vals.vendor)}\">Copy</button>`
+            + `<div><strong>Catalog #:</strong> ${vals.catalog || '<em>(empty)</em>'}</div><button type=\"button\" class=\"btn secondary\" data-copy=\"${encodeURIComponent(vals.catalog)}\">Copy</button>`
+            + `<div><strong>Location:</strong> ${vals.location || '<em>(empty)</em>'}</div><button type=\"button\" class=\"btn secondary\" data-copy=\"${encodeURIComponent(vals.location)}\">Copy</button>`
+            + `<div><strong>Sub-Location:</strong> ${vals.subloc || '<em>(empty)</em>'}</div><button type=\"button\" class=\"btn secondary\" data-copy=\"${encodeURIComponent(vals.subloc)}\">Copy</button>`
+            + `</div>`
+            + `<div style=\"margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;\">`
+            + `<a href=\"${chosen.url}\" data-variant=\"${chosen.key}\" target=\"_blank\" rel=\"noopener\" class=\"btn\">Open Add Item in Quartzy</a>`
+            + `<button type=\"button\" class=\"btn secondary\" id=\"copy_all_add_fields\">Copy All</button>`
+            + `</div>`
+            + (()=>{
+                const preferNew = !!window._quartzyPreferNewForm;
+                let links = [];
+                if (preferNew){
+                  if (variants.group_new) links.push(`<a href=\"${variants.group_new}\" data-variant=\"group_new\" target=\"_blank\" rel=\"noopener\">Group (new)</a>`);
+                  links.push(`<a href=\"${variants.default_new}\" data-variant=\"default_new\" target=\"_blank\" rel=\"noopener\">Default (new)</a>`);
+                } else {
+                  if (variants.group_new) links.push(`<a href=\"${variants.group_new}\" data-variant=\"group_new\" target=\"_blank\" rel=\"noopener\">Group (new)</a>`);
+                  links.push(`<a href=\"${variants.default_new}\" data-variant=\"default_new\" target=\"_blank\" rel=\"noopener\">Default (new)</a>`);
+                  links.push(`<a href=\"${variants.default_no_query}\" data-variant=\"default_no_query\" target=\"_blank\" rel=\"noopener\">Default (no query)</a>`);
+                  if (variants.group) links.push(`<a href=\"${variants.group}\" data-variant=\"group\" target=\"_blank\" rel=\"noopener\">Group</a>`);
+                  if (variants.group_no_query) links.push(`<a href=\"${variants.group_no_query}\" data-variant=\"group_no_query\" target=\"_blank\" rel=\"noopener\">Group (no query)</a>`);
+                }
+                return links.join(' • ');
+              })()
+            + `</div>`
+            + `</div>`;
+          setOtherStatus(html);
+          // Add helper UI inside the Inventory status card
+          try{ const card = document.getElementById('inventory_status_card'); if(card) appendQuartzyHelperUI(card); }catch{}
+          // Navigate the pre-opened tab to the prefilled Add Item link
+          try { if (preTab && !preTab.closed) preTab.location.href = chosen.url; } catch(_){ }
+          document.getElementById('copy_all_add_fields')?.addEventListener('click', ()=> copyToClipboard(copyAll));
+          document.querySelectorAll('#other_status [data-copy]')?.forEach(btn=>{ btn.addEventListener('click', ()=>{ const v=decodeURIComponent(btn.getAttribute('data-copy')||''); copyToClipboard(v); }); });
+          document.getElementById('qz_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Quartzy Full Debug]','color:#7c3aed;font-weight:700'); console.dir(window._lastQuartzyStatus||{}); console.groupEnd(); }catch{} });
+          document.getElementById('qz_copy_debug')?.addEventListener('click',()=>{ try{ const p=JSON.stringify(window._lastQuartzyStatus||{},null,2); copyToClipboard(p);}catch{} });
+          // Even when inventory isn't updated, show Order Adjust job status if it was started
+          try{
+            if (qz && qz.partial && Object.prototype.hasOwnProperty.call(qz,'order_adjust_started') && qz.order_adjust_started && qz.order_adjust_op_id){
+              const container = document.getElementById('order_status_card');
+              const secId = 'order_adjust_status_'+String(qz.order_adjust_op_id);
+              const sec = document.createElement('div');
+              sec.id = secId;
+              sec.style.marginTop = '8px';
+              sec.style.padding = '8px 10px';
+              sec.style.border = '1px dashed #d0d5dd';
+              sec.style.borderRadius = '10px';
+              const remText = (typeof qz.remaining_qty === 'number') ? `Remaining expected will be set to ${qz.remaining_qty}.` : '';
+              sec.innerHTML = '<div style="font-weight:600;margin-bottom:4px;">Order Adjust</div>'
+                + `<div>Adjusting order expected quantity via UI… <span class="hint">(${qz.order_adjust_op_id})</span></div>`
+                + (remText ? `<div class="hint" style="margin-top:4px;">${remText}</div>` : '')
+                + (qz.order_adjust_screenshot ? ` <div class="hint">A screenshot will appear here after it runs.</div>` : '');
+              container?.appendChild(sec);
+              const poll = async ()=>{
+                try{
+                  const url = qz.order_adjust_status_endpoint || (`/api/quartzy/order/adjust/status?op_id=${encodeURIComponent(qz.order_adjust_op_id)}`);
+                  const rr = await fetch(url);
+                  const dd = await rr.json();
+                  if (dd && dd.status){
+                    if (dd.success){
+                      const link = dd.app_url ? `<a href="${dd.app_url}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;">Open Order</a>` : '';
+                      sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div><span style=\"color:#056d41;\">Order expected quantity adjusted</span> ${link}</div>`;
+                      return;
+                    }
+                    if (["error","unknown"].includes(dd.status)){
+                      const shot = (dd.log||[]).find?.(x=>x.path && String(x.msg||'').includes('screenshot_saved'))?.path || qz.order_adjust_screenshot || '';
+                      const shotLink = shot ? `<a class=\"btn secondary\" href=\"/${String(shot).replace(/^\/+/,'')}\" target=\"_blank\" rel=\"noopener\">View Screenshot</a>` : '';
+                      const dbgBtn = Array.isArray(dd.log) && dd.log.length ? `<button type=\"button\" class=\"btn secondary\" id=\"ord_adj_show_dbg\">Show Debug</button>` : '';
+                      const copyBtn = Array.isArray(dd.log) && dd.log.length ? `<button type=\"button\" class=\"btn secondary\" id=\"ord_adj_copy_dbg\">Copy Debug</button>` : '';
+                      const reason = dd.error ? ` <span class=\"hint\">(${String(dd.error).slice(0,140)})</span>` : '';
+                      sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div><span style=\"color:#b30000;\">Order adjust failed</span>${reason} ${shotLink} ${dbgBtn} ${copyBtn}</div>`;
+                      document.getElementById('ord_adj_show_dbg')?.addEventListener('click', ()=>{ try{ console.group('%c[Order Adjust Debug Log]','color:#b00020;font-weight:700'); console.dir(dd); console.groupEnd(); }catch{} });
+                      document.getElementById('ord_adj_copy_dbg')?.addEventListener('click', ()=>{ try{ copyToClipboard(JSON.stringify(dd,null,2)); }catch{} });
+                      return;
+                    }
+                    sec.innerHTML = `<div style=\"font-weight:600;margin-bottom:4px;\">Order Adjust</div><div>Adjusting order via UI… <span class=\"hint\">(${dd.status})</span></div>`;
+                  }
+                }catch{}
+                setTimeout(poll, 1500);
+              };
+              poll();
+            }
+          }catch{}
+        }
+        updateOverlay('Done'); setOverlayState('success'); hideOverlay(600);
+      }catch(e){
+        setOtherStatus('<span style="color:#b30000;">Network error submitting reception</span>');
+        // On network error we won't auto-navigate; leave the standby tab as-is so user can close it
+        setOverlayState('error'); hideOverlay(600);
+      }
+    });
+
+    // Capture clicks on any variant link to remember user's working choice
+    document.addEventListener('click', (e)=>{
+      try{
+        const a = e.target && e.target.closest ? e.target.closest('a[data-variant]') : null;
+        if (a && a.dataset && a.dataset.variant){ setPreferredAddVariant(a.dataset.variant); }
+      }catch{}
+    });
+
+  // Do not auto-select any form on load; wait for explicit item type selection
+
+    // Helper: upload selected pictures and return saved relative paths
+    async function uploadSelectedPictures(inputId){
+      try{
+        const el = document.getElementById(inputId);
+        if(!el || !el.files || !el.files.length) return [];
+        const fd = new FormData();
+        [...el.files].forEach(file => fd.append('files', file));
+        const resp = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await resp.json();
+        const saved = Array.isArray(data?.saved) ? data.saved : [];
+        return saved.map(n => `uploads/${n}`);
+      }catch(e){ return []; }
+    }
+
+    // Load ClickUp projects for Samples flow
+    let _samplesTasksCache = null;
+    async function loadSamplesProjects(){
+      const sel = document.getElementById('samples_project');
+      const status = document.getElementById('samples_status');
+      if(!sel) return;
+      if(_samplesTasksCache){
+        renderSamplesOptions(_samplesTasksCache);
+        return;
+      }
+      sel.innerHTML = '<option value="">Loading…</option>';
+      if(status) status.textContent = 'Loading projects from ClickUp…';
+      try{
+        const r = await fetch('/api/samples_tasks');
+        const d = await r.json();
+        if(d && Array.isArray(d.filtered_tasks)){
+          _samplesTasksCache = d.filtered_tasks;
+          dbg('Samples Tasks Loaded', ()=>{ console.log('Count:', d.filtered_tasks.length); if(d.filtered_tasks.length){ console.table(d.filtered_tasks.map(t=>({id:t.id,name:t.name,pm:t.project_manager,bsl2:t.bsl2_status})));} });
+          renderSamplesOptions(d.filtered_tasks);
+          if(status) status.textContent = d.filtered_tasks.length ? '' : 'No projects available (filter returned 0).';
+          bindSamplesProjectChange();
+        }else{
+          const err = d && d.error ? String(d.error) : 'Unexpected response from /api/samples_tasks';
+          if(status) status.innerHTML = `<span style="color:#b30000;">${err}</span>`;
+          sel.innerHTML = '<option value="">Unavailable</option>';
+        }
+      }catch(e){
+        if(status) status.innerHTML = '<span style="color:#b30000;">Failed to load projects.</span>';
+        sel.innerHTML = '<option value="">Unavailable</option>';
+      }
+    }
+    function renderSamplesOptions(list){
+      const sel = document.getElementById('samples_project'); if(!sel) return;
+      const opts = ['<option value="">Select Project</option>']
+        .concat((list||[]).map(t=>{
+          const title = [t.project_manager?`PM: ${t.project_manager}`:'', t.bsl2_status? 'BSL2' : ''].filter(Boolean).join(' • ');
+          return `<option value="${t.id}" title="${title}">${t.name||t.id}</option>`;
+        }));
+      sel.innerHTML = opts.join('');
+    }
+
+    function bindSamplesProjectChange(){
+      const sel = document.getElementById('samples_project');
+      if(!sel || sel._bound) return; sel._bound = true;
+      sel.addEventListener('change', ()=>{
+        const id = sel.value; const t = (_samplesTasksCache||[]).find(x=>String(x.id)===String(id));
+        if(!id || !t){ document.getElementById('samples_fields').innerHTML = ''; return; }
+        renderSamplesPrefill(t);
+      });
+    }
+
+    async function ensureStorageLocations(){
+      try{
+        if(window._storageLocations) return window._storageLocations;
+        const r = await fetch('/api/storage_locations');
+        const d = await r.json();
+        window._storageLocations = (d && d.storage_locations) ? d.storage_locations : {};
+        return window._storageLocations;
+      }catch{ return {}; }
+    }
+
+    function buildStorageOptions(map){
+      const cats = Object.keys(map||{});
+      return ['<option value="">Storage</option>'].concat(cats.map(c=>`<option>${c}</option>`)).join('');
+    }
+    function buildLocationOptions(map, cat){
+      const arr = (map||{})[cat] || [];
+      return ['<option value="">Location</option>'].concat(arr.map(x=>`<option>${x}</option>`)).join('');
+    }
+
+    // Helpers to compute a consistent background color and initials from PM info
+    function colorFromString(str){
+      try{
+        let s = String(str||''); let hash = 0; for(let i=0;i<s.length;i++){ hash = s.charCodeAt(i) + ((hash<<5) - hash); hash|=0; }
+        const h = Math.abs(hash) % 360; const sat = 65; const light = 45; return `hsl(${h}, ${sat}%, ${light}%)`;
+      }catch{ return '#2f6f7f'; }
+    }
+    function initialsFromName(name){
+      try{
+        const parts = String(name||'').trim().split(/\s+/).filter(Boolean);
+        const letters = parts.slice(0,2).map(p=>p[0]).join('') || (String(name||'?')[0]||'?');
+        return letters.toUpperCase();
+      }catch{ return '?'; }
+    }
+
+    async function renderSamplesPrefill(task){
+      const wrap = document.getElementById('samples_fields');
+      if(!wrap) return;
+      const storageMap = await ensureStorageLocations();
+      const pm = task.project_manager || '';
+      const bsl2 = !!task.bsl2_status;
+      const pmColor = colorFromString(pm || task.project_manager_id || 'PM');
+      const pmInitials = initialsFromName(pm || 'PM');
+      const bsl2Html = bsl2 ? `<span class="bsl2-flag" title="BSL2"><span aria-hidden="true">☣</span> BSL2</span>` : ``;
+      // Recover existing number of samples from task custom fields
+      const ITEM_NUMBER_CF_ID = 'e34a130b-733b-477f-a8de-3e8765831c44';
+      const existingCount = (()=>{
+        try{
+          const cfs = task.custom_fields || []; const cf = cfs.find(x=>String(x.id)===ITEM_NUMBER_CF_ID);
+          let v = cf ? cf.value : null; if(v==null) return '';
+          if(typeof v === 'string'){ if(/^\d+$/.test(v.trim())) return v.trim(); return v; }
+          if(typeof v === 'number') return String(v);
+          return String(v);
+        }catch{return ''}
+      })();
+      const metaHtml = `<div class="samples-meta" style="margin-top:8px;">
+          <span class="pm-label">Project Manager:</span>
+          <div class="pm-badge" title="Project Manager">
+            <span class="pm-avatar" style="background:${pmColor}">${pmInitials}</span>
+            <span class="pm-name">${pm || 'Unknown PM'}</span>
+          </div>
+          ${bsl2Html}
+        </div>`;
+      const formHtml = `
+        <div class="row" style="margin-top:10px;">
+          <div class="col-6">
+            <label>Number of Samples</label>
+            <div style="display:flex; align-items:center;">
+              <input id="samples_quantity" type="number" min="0" placeholder="# of Samples">
+              ${existingCount!=='' ? `<span class="fraction-hint">/ <span id="samples_count_from_task">${existingCount}</span></span>` : ''}
+            </div>
+          </div>
+          <div class="col-6">
+            <label>Client</label>
+            <input id="samples_client" placeholder="Client name">
+          </div>
+          <div class="col-6">
+            <label>Package Status</label>
+            <select id="samples_package_status">
+              <option>All Good</option>
+              <option>Completed With Conditions</option>
+              <option>Package Damaged</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label>Storage</label>
+            <select id="samples_storage">${buildStorageOptions(storageMap)}</select>
+          </div>
+          <div class="col-6">
+            <label>Location</label>
+            <select id="samples_location"><option value="">Location</option></select>
+          </div>
+          <div class="col-6">
+            <label>Sub-Location</label>
+            <input id="samples_sub_location" placeholder="Sub-Location">
+          </div>
+          <div class="col-6">
+            <label>Received By?</label>
+            <div class="actions">
+              <select id="samples_received_by" style="min-width:220px"><option value="">Loading...</option></select>
+              <button class="btn secondary" id="samples_refresh_employees" type="button">🔄 Refresh</button>
+            </div>
+          </div>
+          <div class="col-12">
+            <label>Add Pictures</label>
+            <div class="actions">
+              <button class="btn" id="samples_btn_take" type="button">📷 Take Photos</button>
+              <button class="btn secondary" id="samples_btn_gallery" type="button">🖼️ Add from Gallery</button>
+            </div>
+            <input id="samples_pics" type="file" accept="image/*" capture="environment" multiple style="display:none">
+            <div class="hint" id="samples_pics_status"></div>
+          </div>
+          <div class="col-12">
+            <label>Comments</label>
+            <textarea id="samples_comments" rows="2" placeholder="comments here"></textarea>
+          </div>
+        </div>
+        <input type="hidden" id="samples_pm" value="${pm}">
+        <input type="hidden" id="samples_bsl2" value="${bsl2? '1':'0'}">
+      `;
+      wrap.innerHTML = metaHtml + formHtml;
+      const storageSel = document.getElementById('samples_storage');
+      const locSel = document.getElementById('samples_location');
+      storageSel.addEventListener('change', ()=>{ locSel.innerHTML = buildLocationOptions(storageMap, storageSel.value); });
+      // Employees
+      loadEmployees('samples_received_by');
+      document.getElementById('samples_refresh_employees')?.addEventListener('click', ()=>{ window._employeesCache = null; loadEmployees('samples_received_by'); });
+  // Samples photos wiring (reuse Quartzy approach)
+  document.getElementById('samples_btn_take')?.addEventListener('click', ()=>{ const input=document.getElementById('samples_pics'); if(input){ input.setAttribute('capture','environment'); input.click(); }});
+  document.getElementById('samples_btn_gallery')?.addEventListener('click', ()=>{ const input=document.getElementById('samples_pics'); if(input){ input.removeAttribute('capture'); input.click(); }});
+  document.getElementById('samples_pics')?.addEventListener('change', (e)=>{ const st=document.getElementById('samples_pics_status'); const files = e.target && e.target.files ? e.target.files.length : 0; if(st) st.textContent = files ? `${files} picture${files>1?'s':''} selected.` : ''; });
+    }
+
+    // Submit Samples form
+    document.getElementById('samples_submit_btn')?.addEventListener('click', async ()=>{
+      const taskId = document.getElementById('samples_project')?.value || '';
+      if(!taskId){ alert('Select a project first'); return; }
+      const quantity = document.getElementById('samples_quantity')?.value || '';
+      const client = document.getElementById('samples_client')?.value?.trim() || '';
+      const package_status = document.getElementById('samples_package_status')?.value || '';
+      const storage = document.getElementById('samples_storage')?.value || '';
+      const locationVal = document.getElementById('samples_location')?.value || '';
+      const subLoc = document.getElementById('samples_sub_location')?.value || '';
+      const received_by = document.getElementById('samples_received_by')?.options[document.getElementById('samples_received_by').selectedIndex]?.textContent || '';
+      const received_by_id = document.getElementById('samples_received_by')?.value || '';
+      const comments = document.getElementById('samples_comments')?.value || '';
+      const pm = document.getElementById('samples_pm')?.value || '';
+      const bsl2 = (document.getElementById('samples_bsl2')?.value || '') === '1';
+      showOverlay('Submitting sample reception...');
+      const samplesPics = await uploadSelectedPictures('samples_pics');
+      const payload = new URLSearchParams({
+        form_type: 'samples', task_id: taskId, quantity,
+        client, package_status,
+        storage_location: storage, location: locationVal, sub_location: subLoc,
+        received_by, received_by_id, comments, pictures: samplesPics.join(','),
+        project_manager: pm, bsl2: String(bsl2)
+      });
+      try{
+        const resp = await fetchWithTimeout('/api/submit', { method:'POST', body: payload }, 60000);
+        const txt = await resp.text(); let data=null; try{ data = txt? JSON.parse(txt) : null;}catch{}
+        if(!resp.ok){ document.getElementById('samples_status').innerHTML = `<span style='color:#b30000;'>Submit failed</span> <code>${(txt||'').slice(0,200)}</code>`; setOverlayState('error'); hideOverlay(500); return; }
+        document.getElementById('samples_status').innerHTML = `<span style='color:#056d41;'>Submitted to ClickUp</span>`;
+        setOverlayState('success'); hideOverlay(600);
+        dbg('Samples Submit Response', ()=>{ console.dir(data); });
+      }catch(e){
+        document.getElementById('samples_status').innerHTML = '<span style="color:#b30000;">Network error submitting sample reception</span>';
+        setOverlayState('error'); hideOverlay(600);
+      }
+    });
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+
+# Environments
+.env
+.venv/
+venv/
+
+# Test/coverage
+.pytest_cache/
+htmlcov/
+.coverage*
+
+# Editor
+.vscode/
+*.swp
+
+# App data
+uploads/
+reception_log.db
+reception_log.csv
+log/
+
+# Node (if ever used)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

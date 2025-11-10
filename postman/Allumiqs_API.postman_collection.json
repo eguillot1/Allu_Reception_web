@@ -1,0 +1,172 @@
+{
+  "info": {
+    "name": "Allumiqs API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Submission",
+      "item": [
+        {
+          "name": "Submit Reception (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","submit"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"form_type\": \"samples\",\n  \"task_id\": \"12345\",\n  \"item_name\": \"Test Sample\",\n  \"quantity\": \"10\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Note: Pre-request scripts run before the request is sent, so the response object is not yet available.",
+                  "// Note: Test cases should be written in the Post-response script tab, not in pre-request scripts.",
+                  "pm.environment.set('submitTimestamp', new Date().toISOString());"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const responseBodyJson = pm.response.json();",
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Overall success true', function () { pm.expect(responseBodyJson).to.have.property('overall_success', true); });",
+                  "pm.test('Includes power_automate tuple', function () { pm.expect(responseBodyJson.power_automate).to.exist; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ClickUp",
+      "item": [
+        {
+          "name": "List Sample Tasks",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{baseUrl}}/api/samples_tasks","host": ["{{baseUrl}}"],"path": ["api","samples_tasks"]}
+          },
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["// Note: Pre-request scripts run before the request is sent, so the response object is not yet available.","// Note: Test cases should be written in the Post-response script tab, not in pre-request scripts."], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["const responseBodyJson = pm.response.json();","pm.test('Status code is 200', function () { pm.response.to.have.status(200); });","pm.test('Has tasks array or list', function () { pm.expect(responseBodyJson).to.satisfy(r => Array.isArray(r) || Array.isArray(r.tasks) || Array.isArray(r.orders)); });"], "type": "text/javascript"}}
+          ]
+        }
+        ,
+        {
+          "name": "ClickUp Health",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{baseUrl}}/api/clickup/health?probe=1","host": ["{{baseUrl}}"],"path": ["api","clickup","health"],"query": [{"key":"probe","value":"1"}]}
+          },
+          "event": [
+            {"listen": "test","script": {"exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));","const j = pm.response.json();","pm.test('Has token flag', () => pm.expect(j).to.have.property('has_token'));"], "type":"text/javascript"}}
+          ]
+        },
+        {
+          "name": "ClickUp Direct Update (Test)",
+          "request": {
+            "method": "POST",
+            "header": [{"key":"Content-Type","value":"application/json"}],
+            "url": {"raw": "{{baseUrl}}/api/clickup/update","host": ["{{baseUrl}}"],"path": ["api","clickup","update"]},
+            "body": {"mode":"raw","raw": "{\n  \"task_id\": \"REPLACE-TASK-ID\",\n  \"item_name\": \"Test Sample\",\n  \"quantity\": \"3\",\n  \"comments\": \"Reception test via Postman\",\n  \"storage_location\": \"4°C\",\n  \"location\": \"Glass Door 4°C\",\n  \"sub_location\": \"Top Shelf\",\n  \"received_by_id\": \"123456\",\n  \"timestamp\": \"2025-10-17T12:00:00Z\"\n}"}
+          },
+          "event": [
+            {"listen": "test","script": {"exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));","const j = pm.response.json();","pm.test('Has success or field plan', () => pm.expect(j).to.satisfy(o => typeof o.success !== 'undefined' || Array.isArray(o.field_update_plan)));"], "type":"text/javascript"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quartzy",
+      "item": [
+        {
+          "name": "List Orders (Fast)",
+          "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/quartzy/orders?fast=1","host": ["{{baseUrl}}"], "path": ["api","quartzy","orders"], "query": [{"key": "fast", "value": "1"}]}},
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["// Note: Pre-request scripts run before the request is sent, so the response object is not yet available.","pm.environment.set('ordersRequestedAt', new Date().toISOString());"], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["const responseBodyJson = pm.response.json();","pm.test('Status code is 200', function () { pm.response.to.have.status(200); });","pm.test('Orders present', function () { pm.expect(responseBodyJson).to.have.property('orders'); pm.expect(responseBodyJson.orders).to.be.an('array'); });","pm.test('Debug contains status keys', function () { pm.expect(responseBodyJson.debug).to.be.an('object'); });"], "type": "text/javascript"}}
+          ]
+        },
+        {
+          "name": "Inventory Candidates Find",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{baseUrl}}/api/quartzy/inventory/find","host": ["{{baseUrl}}"], "path": ["api","quartzy","inventory","find"]}, "body": {"mode": "raw", "raw": "{\n  \"item_name\": \"Buffer\",\n  \"vendor_name\": \"VendorX\",\n  \"catalog_number\": \"CAT123\"\n}"}},
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["// Note: Pre-request scripts run before the request is sent, so the response object is not yet available.","pm.environment.set('inventorySearchAt', new Date().toISOString());"], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["const responseBodyJson = pm.response.json();","pm.test('Status code is 200', function () { pm.response.to.have.status(200); });","pm.test('Candidates array exists', function () { pm.expect(responseBodyJson).to.have.property('candidates'); });"], "type": "text/javascript"}}
+          ]
+        },
+        {
+          "name": "Ensure Inventory Item Exists (Manual Add Link)",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{baseUrl}}/api/quartzy/inventory/ensure","host": ["{{baseUrl}}"], "path": ["api","quartzy","inventory","ensure"]}, "body": {"mode": "raw", "raw": "{\n  \"item_name\": \"Buffer\",\n  \"vendor_name\": \"VendorX\"\n}"}},
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["// Note: Pre-request scripts run before the request is sent, so the response object is not yet available."], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["const responseBodyJson = pm.response.json();","pm.test('Status code is 200', function () { pm.response.to.have.status(200); });","pm.test('Either exists or manual_add_link provided', function () { pm.expect(responseBodyJson.exists === true || !!responseBodyJson.add_link).to.be.true; });"], "type": "text/javascript"}}
+          ]
+        },
+        {
+          "name": "Inventory Match (Backend Best Match)",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{baseUrl}}/api/quartzy/inventory/match","host": ["{{baseUrl}}"], "path": ["api","quartzy","inventory","match"]}, "body": {"mode": "raw", "raw": "{\n  \"item_name\": \"Buffer\",\n  \"vendor_name\": \"VendorX\",\n  \"catalog_number\": \"CAT123\"\n}"}},
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["pm.environment.set('inventoryMatchAt', new Date().toISOString());"], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["const j = pm.response.json();","pm.test('Status 200', () => pm.response.to.have.status(200));","pm.test('Has match object or null', () => pm.expect(j).to.have.property('match'));"], "type": "text/javascript"}}
+          ]
+        },
+        {
+          "name": "Inventory Quantity Update (Backend Additive)",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{baseUrl}}/api/quartzy/inventory/update","host": ["{{baseUrl}}"], "path": ["api","quartzy","inventory","update"]}, "body": {"mode": "raw", "raw": "{\n  \"item_id\": \"{{quartzyInventoryItemId}}\",\n  \"add_quantity\": 5\n}"}},
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["pm.environment.set('inventoryUpdateAttemptAt', new Date().toISOString());"], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["const j = pm.response.json();","pm.test('Status 200', () => pm.response.to.have.status(200));","pm.test('Contains attempts debug', () => pm.expect(j).to.have.property('attempts'));"], "type": "text/javascript"}}
+          ]
+        },
+        {
+          "name": "Quartzy Direct GET Inventory Item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "Access-Token", "value": "{{quartzyToken}}"}
+            ],
+            "url": {"raw": "{{quartzyBaseUrl}}/inventory-items/{{quartzyInventoryItemId}}","host": ["{{quartzyBaseUrl}}"], "path": ["inventory-items","{{quartzyInventoryItemId}}"]}
+          },
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["// Direct Quartzy item fetch"], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["let ok = pm.response.code;","pm.test('2xx status', () => pm.expect(ok).to.be.within(200,299));","const j = pm.response.json();","pm.test('Has quantity or quantity_in_stock', () => pm.expect(j).to.satisfy(o => 'quantity' in o || 'quantity_in_stock' in o || (o.data && o.data.attributes)));"], "type": "text/javascript"}}
+          ]
+        },
+        {
+          "name": "Quartzy Direct PATCH Inventory Item (JSON:API)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Content-Type", "value": "application/vnd.api+json"},
+              {"key": "Accept", "value": "application/vnd.api+json"},
+              {"key": "Access-Token", "value": "{{quartzyToken}}"}
+            ],
+            "url": {"raw": "{{quartzyBaseUrl}}/inventory-items/{{quartzyInventoryItemId}}","host": ["{{quartzyBaseUrl}}"], "path": ["inventory-items","{{quartzyInventoryItemId}}"]},
+            "body": {"mode": "raw", "raw": "{\n  \"data\": {\n    \"type\": \"inventory-items\",\n    \"id\": \"{{quartzyInventoryItemId}}\",\n    \"attributes\": {\n      \"quantity\": {{quartzyNewQuantity}}\n    }\n  }\n}"}
+          },
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["// JSON:API quantity update attempt","pm.environment.set('quartzyPatchAttempt', new Date().toISOString());"], "type": "text/javascript"}},
+            {"listen": "test", "script": {"exec": ["pm.test('Status 200/202/204', () => pm.expect([200,202,204]).to.include(pm.response.code));","const j = pm.response.json ? pm.response.json() : {};","pm.test('Echoes id', () => { if(j.data) pm.expect(j.data.id).to.eql(pm.environment.get('quartzyInventoryItemId')); });"], "type": "text/javascript"}}
+          ]
+        }
+      ]
+    }
+  ]
+}
