@@ -86,8 +86,8 @@
         <div id="item_type_toggle" class="actions">
           <button type="button" class="item-type-square" data-value="Samples"
           image-url="/static/assets/clickup-logo.png">Samples</button>
-          <button type="button" class="item-type-square" data-value="Other"
-          image-url="/static/assets/quartzy-logo.png">Other</button>
+          <button type="button" class="item-type-square" data-value="Quartzy"
+          image-url="/static/assets/quartzy-logo.png">Quartzy</button>
         </div>
       </div></div>
     </div>
@@ -471,14 +471,19 @@
     }
 
     // Item type toggle
+    // Note: treat 'Quartzy' the same as 'Other' so a button labelled 'Quartzy' with data-value="Quartzy"
+    // will show the same form and trigger the same Quartzy-related loaders.
     document.getElementById('item_type_toggle').addEventListener('click', (e)=>{
       const btn = e.target.closest('.item-type-square'); if(!btn) return;
       [...document.querySelectorAll('#item_type_toggle .item-type-square')].forEach(b=>b.classList.remove('selected'));
       btn.classList.add('selected'); const v = btn.dataset.value;
       dbg('Item Type Toggle', ()=>{ console.log('Selected:', v); });
+      // Show Samples form only when Samples selected
       document.getElementById('samples_form').style.display = (v==='Samples')? '': 'none';
-      document.getElementById('other_form').style.display = (v==='Other')? '': 'none';
-      if (v==='Other') { loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations(); }
+      // Show other_form for both 'Other' and 'Quartzy' values
+      document.getElementById('other_form').style.display = (v==='Other' || v==='Quartzy')? '': 'none';
+      // When user picks Quartzy/Other, load Quartzy-specific data
+      if (v==='Other' || v==='Quartzy') { loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations(); }
       if (v==='Samples') { loadSamplesProjects(); }
     });
 
