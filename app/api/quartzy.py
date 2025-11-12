@@ -479,3 +479,51 @@ def quartzy_order_adjust_status(op_id: str = Query(...)):
     if not get_adjust_job:
         return JSONResponse(status_code=400, content={"error": "order_adjust_unavailable"})
     return get_adjust_job(op_id)
+
+# -------- New simple receive workflow (strict match; else open order page) --------
+@router.post("/workflow/receive")
+def quartzy_workflow_receive(payload: dict = Body(...)):
+    """Execute the simplified receive flow:
+    - Inputs: {order_id, received_quantity?, location?, sub_location?, lab_id?}
+    - If no inventory match: returns {action:"open_request", order_url}
+    - If match: updates inventory target quantity and marks order RECEIVED
+    """
+    try:
+        res = getattr(quartzy_mod, "quartzy_receive_order_basic")(payload)
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+@router.post("/workflow/match")
+def quartzy_workflow_match(payload: dict = Body(...)):
+    """Return strict inventory match for a given order_id; include order_url to open if not found."""
+    try:
+        order_id = str(payload.get("order_id") or payload.get("id") or "").strip()
+        if not order_id:
+            return JSONResponse(status_code=422, content={"error": "missing_order_id"})
+        ord_res = quartzy_mod.quartzy_service.get_order_request(order_id)
+        if not (ord_res and ord_res.get("found")):
+            return JSONResponse(status_code=404, content={"error": "order_not_found", "order_id": order_id})
+        order = ord_res.get("order") or {}
+        app_url = order.get("app_url")
+        item_name = (order.get("item_name") or order.get("name") or "").strip()
+        vendor_name = (order.get("vendor_name") or order.get("vendor") or "").strip()
+        try:
+            catalog_number, _ = quartzy_mod.quartzy_service._extract_catalog_number(order)
+        except Exception:
+            catalog_number = None
+        lab_id = payload.get("lab_id")
+        match = quartzy_mod.quartzy_service.strict_inventory_match(item_name=item_name, vendor_name=vendor_name, catalog_number=catalog_number, lab_id=lab_id)
+        out = {"found": bool(match.get("found")), "order_url": app_url, "order_id": order_id, "order": {"name": item_name, "vendor": vendor_name, "catalog_number": catalog_number}}
+        if match.get("found"):
+            item = match.get("item") or {}
+            rec = quartzy_mod.quartzy_service._extract_location_record(item)
+            out.update({
+                "inventory_item_id": match.get("id") or item.get("id"),
+                "item": item,
+                "location": rec.get("location"),
+                "sub_location": rec.get("sub_location"),
+            })
+        return out
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})

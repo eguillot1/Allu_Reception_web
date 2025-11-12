@@ -467,7 +467,7 @@ class QuartzyService:
                 if resp.status_code == 404 or ("no such operation" in (resp.text or "").lower()):
                     continue
                 data = resp.json() if resp.ok else None
-            except Exception:
+            except Exception as ex:
                 attempts.append({
                     "endpoint": ep,
                     "with_lab_id": bool(meta.get("with_lab_id")),
@@ -1010,9 +1010,11 @@ class QuartzyService:
             match = self.find_inventory_match(item_name=item_name, vendor_name=vendor_name, catalog_number=catalog_number, lab_id=lab_id)
         except Exception:
             match = {"found": False}
-        if match.get("found"):
-            item = match.get("item") or {}
-            item_id = item.get("id") or item.get("inventory_item_id") or item.get("raw_id")
+        if isinstance(match, dict) and bool(match.get("found")):
+            item_obj = match.get("item") if isinstance(match.get("item"), dict) else {}
+            item_id = None
+            if isinstance(item_obj, dict):
+                item_id = item_obj.get("id") or item_obj.get("inventory_item_id") or item_obj.get("raw_id")
             if if_exists == "update" and quantity is not None and item_id:
                 upd = self.update_inventory_item(item_id=str(item_id), quantity=str(quantity))
                 res = {"exists": True, "updated": bool(upd.get("updated")), "match": match, "update_result": upd}
@@ -2031,6 +2033,117 @@ class QuartzyService:
                     tries.append({"url": url, "method": "PATCH", "exception": str(e), "body_shape": list(body.keys())})
         return {"updated": False, "attempts": tries, "error": "no_variant_succeeded"}
 
+    # ---------- New simple workflow: strict match then update or open order page ----------
+    def _norm_exact(self, s: Optional[str]) -> str:
+        try:
+            return (s or "").strip().lower()
+        except Exception:
+            return ""
+
+    def strict_inventory_match(self, item_name: Optional[str], vendor_name: Optional[str], catalog_number: Optional[str], lab_id: Optional[str] = None) -> Dict[str, Any]:
+        """Deterministic inventory match:
+        - First: exact catalog number (case-insensitive)
+        - Else: exact item_name AND vendor_name (both case-insensitive)
+        - Else: no match
+        Returns {found, item, id}
+        """
+        items = self.fetch_inventory_items_fast(lab_id)
+        nm = self._norm_exact(item_name)
+        vn = self._norm_exact(vendor_name)
+        cn = self._norm_exact(catalog_number)
+        # 1) Exact catalog number
+        if cn:
+            for it in items:
+                cand = self._norm_exact(
+                    it.get("catalog_number")
+                    or it.get("vendor_product_id")
+                    or it.get("vendor_product")
+                )
+                if cand and cand == cn:
+                    return {"found": True, "item": it, "id": it.get("id")}
+        # 2) Exact name + vendor
+        if nm and vn:
+            for it in items:
+                iname = self._norm_exact(it.get("name") or it.get("item_name"))
+                ivend = self._norm_exact(it.get("vendor") or it.get("vendor_name"))
+                if iname == nm and ivend == vn:
+                    return {"found": True, "item": it, "id": it.get("id")}
+        return {"found": False}
+
+    def receive_order_basic(self, order_id: str, received_quantity: Optional[int] = None, location: Optional[str] = None, sub_location: Optional[str] = None, lab_id: Optional[str] = None) -> Dict[str, Any]:
+        """Simple receive workflow per new approach:
+        - Fetch order
+        - Strict inventory match (catalog number, else name+vendor)
+        - If no match => instruct to open order page
+        - If match => add received_quantity to current quantity and PUT update; mark order RECEIVED
+        """
+        if not order_id:
+            return {"success": False, "error": "missing_order_id"}
+        ord_res = self.get_order_request(str(order_id))
+        if not (ord_res and ord_res.get("found")):
+            return {"success": False, "error": "order_not_found", "order_id": order_id}
+        order = ord_res.get("order") or {}
+        app_url = order.get("app_url") or None
+        item_name = (order.get("item_name") or order.get("name") or "").strip()
+        vendor_name = (order.get("vendor_name") or order.get("vendor") or "").strip()
+        catalog_number = None
+        try:
+            catalog_number, _ = self._extract_catalog_number(order)
+        except Exception:
+            catalog_number = None
+        # Choose received quantity: provided, else order quantity, else 1
+        recv_qty = None
+        if received_quantity is not None:
+            try:
+                recv_qty = int(received_quantity)
+            except Exception:
+                recv_qty = None
+        if recv_qty is None:
+            oq = order.get("quantity")
+            try:
+                if oq is not None:
+                    recv_qty = int(str(oq).split(".")[0])
+            except Exception:
+                recv_qty = None
+        if recv_qty is None:
+            recv_qty = 1
+        # Strict match
+        match = self.strict_inventory_match(item_name=item_name, vendor_name=vendor_name, catalog_number=catalog_number, lab_id=lab_id)
+        if not match.get("found"):
+            return {
+                "success": False,
+                "action": "open_request",
+                "reason": "no_inventory_match",
+                "order_id": order_id,
+                "order_url": app_url,
+                "order": {"name": item_name, "vendor": vendor_name, "catalog_number": catalog_number},
+            }
+        inv_id = match.get("id")
+        # Fetch current to compute target
+        current_qty = 0
+        try:
+            curr = self.get_inventory_item(str(inv_id))
+            raw = (curr.get("item") or {}) if isinstance(curr, dict) else {}
+            # Try common keys
+            for k in ("quantity", "quantity_in_stock", "qty", "in_stock_quantity"):
+                if k in raw and raw[k] is not None:
+                    try:
+                        current_qty = int(str(raw[k]).split(".")[0]); break
+                    except Exception:
+                        pass
+        except Exception:
+            current_qty = 0
+        target_qty = max(0, int(current_qty) + int(recv_qty))
+        upd = self.update_inventory_item(item_id=str(inv_id), quantity=str(target_qty))
+        # Order status to RECEIVED
+        ord_upd = self.update_order_request_status(order_id=str(order_id), new_status="RECEIVED")
+        item_url = self.build_quartzy_item_link(str(inv_id)) if inv_id else None
+        return {
+            "success": bool(upd.get("updated") and (ord_upd.get("updated") or ord_upd.get("success"))),
+            "inventory": {**upd, "item_id": inv_id, "item_url": item_url, "target_quantity": target_qty, "added": recv_qty, "current": current_qty},
+            "order": {**ord_upd, "order_id": order_id, "order_url": app_url},
+        }
+
     # collect unique lab locations and sub-locations by scanning inventory
     def collect_lab_locations(self, lab_id: Optional[str] = None, pages: int = 5, refresh: bool = False):
         if not self.enabled or not self.api_token:
@@ -2182,6 +2295,24 @@ def quartzy_update_order_status(order_id: str, new_status: str = "RECEIVED"):  #
 
 def quartzy_decide_status(*args, **kwargs):  # pragma: no cover
     return "unknown"
+
+# New wrapper for simple workflow
+def quartzy_receive_order_basic(payload: Dict[str, Any] | None = None, **kwargs):  # pragma: no cover
+    payload = payload or {}
+    if kwargs:
+        payload = {**payload, **kwargs}
+    order_id = payload.get("order_id") or payload.get("id")
+    if not order_id:
+        return {"success": False, "error": "missing_order_id"}
+    received_quantity = payload.get("received_quantity") or payload.get("quantity")
+    location = payload.get("location") or payload.get("storage_location")
+    sub_location = payload.get("sub_location")
+    lab_id = payload.get("lab_id")
+    try:
+        rq = quartzy_service.receive_order_basic(order_id=str(order_id), received_quantity=(int(received_quantity) if received_quantity is not None else None), location=location, sub_location=sub_location, lab_id=lab_id)
+        return rq
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # Expose debug dict under legacy name
 _quartzy_debug = quartzy_service.debug
