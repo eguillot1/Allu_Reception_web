@@ -189,7 +189,10 @@
           <div class="hint" id="pics_status"></div>
         </div>
       </div>
-      <div class="actions"><button class="btn" id="submit_btn">Submit</button></div>
+      <div class="actions">
+        <button class="btn" id="submit_btn">Submit</button>
+        <button class="btn secondary" id="receive_new_btn" title="Use new simplified workflow">Receive (New Flow)</button>
+      </div>
       <div id="other_status" style="margin-top:12px; font-size:14px; line-height:1.4;"></div>
     </div>
   </div>
@@ -486,28 +489,16 @@
       [...document.querySelectorAll('#item_type_toggle .item-type-square')].forEach(b=>b.classList.remove('selected'));
       btn.classList.add('selected'); const v = btn.dataset.value;
       dbg('Item Type Toggle', ()=>{ console.log('Selected:', v); });
-      // Base: hide all
-      const samplesForm = document.getElementById('samples_form');
-      const otherForm = document.getElementById('other_form');
-      const orderCard = document.getElementById('quartzy_order_card');
-      const matchHint = document.getElementById('quartzy_match_hint');
-      if (samplesForm) samplesForm.style.display = 'none';
-      if (otherForm) otherForm.style.display = 'none';
-      if (orderCard) orderCard.style.display = 'none';
-      if (matchHint) matchHint.style.display = 'none';
-      // Show per selection
-      if (v==='Samples'){
-        if (samplesForm) samplesForm.style.display = '';
-        loadSamplesProjects();
-      } else if (v==='Other'){
-        if (otherForm) otherForm.style.display = '';
-        // Non-Quartzy "Other" still benefits from employees/locations
-        loadEmployees('received_by'); initQuartzyLocations();
-      } else if (v==='Quartzy'){
-        if (orderCard) orderCard.style.display = '';
-        if (matchHint) matchHint.style.display = '';
-        loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations();
-      }
+      // Show Samples form only when Samples selected
+      document.getElementById('samples_form').style.display = (v==='Samples')? '': 'none';
+      // For Quartzy: do NOT show the form yet; we only show it after a strict match
+      const otherForm = document.getElementById('other_form'); if(otherForm) otherForm.style.display = 'none';
+      const hint = document.getElementById('quartzy_match_hint'); if (hint) hint.style.display = (v==='Quartzy')? '': 'none';
+      const orderCard = document.getElementById('quartzy_order_card'); if (orderCard) orderCard.style.display = (v==='Quartzy')? '': 'none';
+      // When user picks Quartzy, load orders/employees/locations; leave form hidden until match
+      if (v==='Quartzy') { loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations(); }
+      if (v==='Other') { /* legacy path if ever used */ loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations(); document.getElementById('other_form').style.display=''; }
+      if (v==='Samples') { loadSamplesProjects(); }
     });
 
     // Employees
@@ -595,27 +586,67 @@
         let obj=null; try{ obj = opt.getAttribute('data-obj'); if(obj) obj = JSON.parse(obj.replace(/&#39;/g,"'")); }catch{}
         if(obj){
           window._lastSelectedOrder = obj; dbg('Order Selected', ()=>{ console.dir(obj); });
-          document.getElementById('item_name').value = obj.name||'';
-          document.getElementById('supplier').value = obj.vendor||'';
-          document.getElementById('catalog_number').value = obj.catalog_number||'';
-          const expectedEl = document.getElementById('expected_quantity');
-          const expectedWrap = document.getElementById('expected_wrap');
-          const expectedDisplay = document.getElementById('expected_display');
-          expectedEl.value = obj.quantity_expected || '';
-          expectedWrap.style.display = obj.quantity_expected? '': 'none';
-          expectedDisplay.textContent = obj.quantity_expected? `${obj.quantity_expected} expected`: '';
-          // Update inline fraction next to Number of Items
-          const frac = document.getElementById('quantity_fraction');
-          if (frac){
-            if (obj.quantity_expected){ frac.textContent = `/ ${obj.quantity_expected}`; frac.style.display = ''; }
-            else { frac.textContent = ''; frac.style.display = 'none'; }
+          // Hide form until match
+          try{ document.getElementById('other_form').style.display='none'; }catch{}
+          // Clear previous inline status and show overlay while matching
+          try{ document.getElementById('quartzy_order_status').innerHTML = ''; }catch{}
+          showOverlay('Checking inventory for selected order…');
+          // Call strict match endpoint for this order
+          try{
+            const payload = { order_id: obj.id };
+            const r = await fetchWithTimeout('/api/quartzy/workflow/match', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }, 25000);
+            const d = await r.json();
+            dbg('Strict Match (Response)', ()=>{ console.dir(d); });
+            if(!r.ok || !d || d.found!==true){
+              const url = (d && d.order_url) ? d.order_url : (obj.app_url||'');
+              const statusEl = document.getElementById('quartzy_order_status');
+              const html = `
+                <div style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
+                  <div style="font-weight:600; margin-bottom:6px;">No inventory match found</div>
+                  <div class="hint" style="margin-bottom:8px;">Open the order in Quartzy to complete reception manually.</div>
+                  ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn">Open Order in Quartzy</a>` : ''}
+                </div>`;
+              if(statusEl) statusEl.innerHTML = html;
+              // Keep form hidden and end overlay
+              setOverlayState('warning'); hideOverlay(600);
+              return;
+            }
+            // Found: prefill and show the form
+            document.getElementById('item_name').value = obj.name||'';
+            document.getElementById('supplier').value = obj.vendor||'';
+            document.getElementById('catalog_number').value = obj.catalog_number||'';
+            document.getElementById('inventory_item_id').value = d.inventory_item_id || '';
+            // Expected quantity UI
+            const expectedEl = document.getElementById('expected_quantity');
+            const expectedWrap = document.getElementById('expected_wrap');
+            const expectedDisplay = document.getElementById('expected_display');
+            expectedEl.value = obj.quantity_expected || '';
+            expectedWrap.style.display = obj.quantity_expected? '': 'none';
+            expectedDisplay.textContent = obj.quantity_expected? `${obj.quantity_expected} expected`: '';
+            const frac = document.getElementById('quantity_fraction');
+            if (frac){ if (obj.quantity_expected){ frac.textContent = `/ ${obj.quantity_expected}`; frac.style.display = ''; } else { frac.textContent = ''; frac.style.display = 'none'; } }
+            const qtyEl = document.getElementById('quantity'); if (qtyEl && obj.quantity_expected) qtyEl.value = obj.quantity_expected;
+            // Prefill location if provided by match
+            try{
+              if (d.location){ const locEl = document.getElementById('location'); const m=[...locEl.options].find(o=> (o.value||o.textContent)===d.location); if(m){ locEl.value = m.value||m.textContent; locEl.dispatchEvent(new Event('change')); } }
+              if (d.sub_location){ const subEl = document.getElementById('sub_location'); const s=[...subEl.options].find(o=> (o.value||o.textContent)===d.sub_location); if(s){ subEl.value = s.value||s.textContent; } }
+            }catch{}
+            // Show form now
+            document.getElementById('other_form').style.display = '';
+            const hint = document.getElementById('quartzy_match_hint'); if (hint) hint.style.display = 'none';
+            setOverlayState('success'); hideOverlay(500);
+          }catch(_){
+            // On error, show inline status with button
+            const url = obj.app_url||'';
+            const statusEl = document.getElementById('quartzy_order_status');
+            const html = `
+              <div style="padding:10px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
+                <div style="font-weight:600; margin-bottom:15px;">No match in inventory</div>
+                ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn">Open Order in Quartzy</a>` : ''}
+              </div>`;
+            if(statusEl) statusEl.innerHTML = html;
+            setOverlayState('error'); hideOverlay(600);
           }
-          const qtyEl = document.getElementById('quantity'); if (qtyEl && obj.quantity_expected) qtyEl.value = obj.quantity_expected;
-          // Reveal the form after an order is selected (Quartzy flow)
-          try{ const otherForm = document.getElementById('other_form'); if (otherForm) otherForm.style.display = ''; }catch{}
-          // Auto-run inventory candidate search if we have a catalog number
-          const cat = (document.getElementById('catalog_number')?.value||'').trim();
-          if (cat) { try{ findInventoryCandidates(); }catch{} }
         }
       }
     });
@@ -858,7 +889,16 @@
           const orderCard = (()=>{
             const showDebug = '<a href="#" id="qz_show_debug" style="margin-left:8px;">Show Debug</a>';
             const copyDebug = '<button type="button" class="btn secondary" id="qz_copy_debug" style="padding:4px 8px;margin-left:6px;">Copy Debug</button>';
-            const inner = `${qzLine ? `<div style=\"margin-bottom:6px;\">${qzLine} ${showDebug} ${copyDebug}</div>` : '<div class="hint">No order changes were requested.</div>'}`;
+            const orderUrl = (window._lastSelectedOrder && window._lastSelectedOrder.app_url) ? String(window._lastSelectedOrder.app_url) : '';
+            const openBtn = orderUrl ? `<a href="${orderUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;">Open Order in Quartzy</a>` : '';
+            const inner = (function(){
+              if (qzLine){
+                return `<div style=\"margin-bottom:6px;\">${qzLine} ${showDebug} ${copyDebug} ${openBtn}</div>`;
+              }
+              let base = '<div class=\"hint\">No order changes were requested.</div>';
+              if (openBtn){ base += ` <div style=\"margin-top:6px;\">${openBtn}</div>`; }
+              return base;
+            })();
             return `<div id="order_status_card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb; margin-bottom:8px;">`
               + `<div style="font-weight:600; margin-bottom:6px;">Order Request</div>`
               + inner
@@ -986,7 +1026,16 @@
           const orderCard = (()=>{
             const showDebug = '<a href="#" id="qz_show_debug" style="margin-left:8px;">Show Debug</a>';
             const copyDebug = '<button type="button" class="btn secondary" id="qz_copy_debug" style="padding:4px 8px;margin-left:6px;">Copy Debug</button>';
-            const inner = `${qzLine ? `<div style=\"margin-bottom:6px;\">${qzLine} ${showDebug} ${copyDebug}</div>` : '<div class="hint">No order changes were requested.</div>'}`;
+            const orderUrl = (window._lastSelectedOrder && window._lastSelectedOrder.app_url) ? String(window._lastSelectedOrder.app_url) : '';
+            const openBtn = orderUrl ? `<a href="${orderUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;">Open Order in Quartzy</a>` : '';
+            const inner = (function(){
+              if (qzLine){
+                return `<div style=\"margin-bottom:6px;\">${qzLine} ${showDebug} ${copyDebug} ${openBtn}</div>`;
+              }
+              let base = '<div class=\"hint\">No order changes were requested.</div>';
+              if (openBtn){ base += ` <div style=\"margin-top:6px;\">${openBtn}</div>`; }
+              return base;
+            })();
             return `<div id="order_status_card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb; margin-bottom:8px;">`
               + `<div style="font-weight:600; margin-bottom:6px;">Order Request</div>`
               + inner
@@ -1028,7 +1077,7 @@
           setOtherStatus(html);
           // Add helper UI inside the Inventory status card
           try{ const card = document.getElementById('inventory_status_card'); if(card) appendQuartzyHelperUI(card); }catch{}
-          
+          // Provide an explicit button to open Quartzy; no auto-popup
           document.getElementById('copy_all_add_fields')?.addEventListener('click', ()=> copyToClipboard(copyAll));
           document.querySelectorAll('#other_status [data-copy]')?.forEach(btn=>{ btn.addEventListener('click', ()=>{ const v=decodeURIComponent(btn.getAttribute('data-copy')||''); copyToClipboard(v); }); });
           document.getElementById('qz_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Quartzy Full Debug]','color:#7c3aed;font-weight:700'); console.dir(window._lastQuartzyStatus||{}); console.groupEnd(); }catch{} });
@@ -1084,9 +1133,52 @@
         updateOverlay('Done'); setOverlayState('success'); hideOverlay(600);
       }catch(e){
         setOtherStatus('<span style="color:#b30000;">Network error submitting reception</span>');
-        // On network error we won't auto-navigate; leave the standby tab as-is so user can close it
+        // On network error we won't open any new tabs automatically
         setOverlayState('error'); hideOverlay(600);
       }
+    });
+
+    // New simplified receive flow: strict match else open order page
+    document.getElementById('receive_new_btn')?.addEventListener('click', async ()=>{
+      const orderId = document.getElementById('quartzy_order')?.value || '';
+      if(!orderId){ alert('Select an Order Request'); return; }
+      const qty = document.getElementById('quantity')?.value || '';
+      const locationVal = document.getElementById('location')?.value || '';
+      const subLoc = document.getElementById('sub_location')?.value || '';
+  showOverlay('Processing (new workflow)...');
+      try{
+        const payload = { order_id: orderId, received_quantity: qty? Number(qty): undefined, location: locationVal||undefined, sub_location: subLoc||undefined };
+        dbg('Receive (New Flow) Request', ()=>{ console.dir(payload); });
+        const r = await fetchWithTimeout('/api/quartzy/workflow/receive', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }, 30000);
+        const d = await r.json();
+        dbg('Receive (New Flow) Response', ()=>{ console.dir(d); });
+        if (!r.ok){ setOtherStatus(`<span style='color:#b30000;'>Receive failed</span> <code>${String(d?.error||'').slice(0,200)}</code>`); setOverlayState('error'); hideOverlay(600); return; }
+        if (d && d.action === 'open_request' && d.order_url){
+          setOtherStatus(`<div class="card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
+            <div style=\"font-weight:600; margin-bottom:6px;\">No inventory match</div>
+            <div class=\"hint\" style=\"margin-bottom:8px;\">Open the order in Quartzy to complete reception manually.</div>
+            <a href=\"${d.order_url}\" target=\"_blank\" rel=\"noopener\" class=\"btn\">Open Order in Quartzy</a>
+          </div>`);
+          setOverlayState('success'); hideOverlay(600);
+          return;
+        }
+        // Success path with updates
+        const inv = d?.inventory || {}; const ord = d?.order || {};
+        const invLine = inv.updated ? '<span style="color:#056d41;">Inventory updated ✅</span>' : '<span class="hint">Inventory updated state unknown</span>';
+        const ordLine = (ord.updated || ord.success) ? '<span style="color:#056d41;">Order marked RECEIVED ✅</span>' : (ord.error? `<span style=\"color:#b30000;\">Order update ❌ ${(String(ord.error)||'').slice(0,120)}</span>` : '<span class="hint">Order update attempted</span>');
+        const orderBtn = ord.order_url ? `<a href="${ord.order_url}" target="_blank" rel="noopener" class="btn">Open Order</a>` : '';
+        const invBtn = inv.item_url ? `<a href="${inv.item_url}" target="_blank" rel="noopener" class="btn">Open Item</a>` : '';
+        setOtherStatus(
+          `<div class="card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb; margin-bottom:8px;">`
+          + `<div style="font-weight:600; margin-bottom:6px;">Order Request</div><div>${ordLine}</div><div style=\"margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;\">${orderBtn}</div>`
+          + `</div>`
+          + `<div class="card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">`
+          + `<div style="font-weight:600; margin-bottom:6px;">Inventory</div><div>${invLine} <span class=\"hint\">(target: ${inv.target_quantity ?? '?'})</span></div>`
+          + `<div style=\"margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;\">${invBtn}</div>`
+          + `</div>`
+        );
+        setOverlayState('success'); hideOverlay(600);
+      }catch(e){ setOtherStatus('<span style="color:#b30000;">Network error (new workflow)</span>'); setOverlayState('error'); hideOverlay(600); }
     });
 
     // Capture clicks on any variant link to remember user's working choice
