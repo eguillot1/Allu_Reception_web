@@ -1381,7 +1381,16 @@
         const resp = await fetchWithTimeout('/api/submit', { method:'POST', body: payload }, 60000);
         const txt = await resp.text(); let data=null; try{ data = txt? JSON.parse(txt) : null;}catch{}
         if(!resp.ok){ document.getElementById('samples_status').innerHTML = `<span style='color:#b30000;'>Submit failed</span> <code>${(txt||'').slice(0,200)}</code>`; setOverlayState('error'); hideOverlay(500); return; }
-        document.getElementById('samples_status').innerHTML = `<span style='color:#056d41;'>Submitted to ClickUp</span>`;
+        try {
+          const ck = data && data.clickup ? data.clickup : null;
+          const taskIdUsed = (ck && ck.task_id) ? ck.task_id : (taskId || '');
+          const taskUrl = (ck && ck.task_url) ? ck.task_url : (taskIdUsed ? `https://app.clickup.com/t/${taskIdUsed}` : '');
+          const btnHtml = taskUrl ? `
+            <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+              <a class="btn" href="${taskUrl}" target="_blank" rel="noopener">Open ClickUp Task</a>
+            </div>` : '';
+          document.getElementById('samples_status').innerHTML = `<span style='color:#056d41;'>Submitted to ClickUp</span>${btnHtml}`;
+        } catch { document.getElementById('samples_status').innerHTML = `<span style='color:#056d41;'>Submitted to ClickUp</span>`; }
         setOverlayState('success'); hideOverlay(600);
         dbg('Samples Submit Response', ()=>{ console.dir(data); });
       }catch(e){

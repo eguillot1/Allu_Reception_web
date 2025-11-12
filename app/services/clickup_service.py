@@ -144,6 +144,7 @@ def send_to_clickup(data: Dict[str, Any]):
         return {"success": False, "reason": "no_task_id"}
     status_report = {
         "task_id": task_id,
+        "task_url": f"https://app.clickup.com/t/{task_id}",
         "bulk_attempted": False,
         "bulk_success": False,
         "fallback_used": False,
