@@ -139,20 +139,12 @@
           <label>Catalog Number</label>
           <div class="actions">
             <input id="catalog_number" placeholder="Catalog Number" style="flex:1;">
-            <button class="btn secondary" id="inventory_find_btn" type="button" title="Find in Quartzy Inventory">🔎 Find</button>
           </div>
-          <div id="inventory_match_status" class="hint"></div>
         </div>
         <input type="hidden" id="inventory_item_id" value="">
-        <div class="col-6" id="expected_wrap" style="display:none;">
-          <label>Expected / Received</label>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span id="expected_display" class="hint"></span>
-          </div>
-          <input type="hidden" id="expected_quantity" value="">
-        </div>
+        <input type="hidden" id="expected_quantity" value="">
         <div class="col-6">
-          <label>Status</label>
+          <label>Package Status</label>
           <select id="status">
             <option>All Good</option>
             <option>Completed With Conditions</option>
@@ -171,7 +163,6 @@
           <label>Received By?</label>
           <div class="actions">
             <select id="received_by" style="min-width:220px"><option value="">Loading...</option></select>
-            <button class="btn secondary" id="refresh_employees" type="button" title="Refresh">🔄 Refresh</button>
           </div>
           <input type="hidden" id="received_by_id">
         </div>
@@ -183,7 +174,6 @@
           <label>Add Pictures</label>
           <div class="actions">
             <button class="btn" id="btn_take" type="button">📷 Take Photos</button>
-            <button class="btn secondary" id="btn_gallery" type="button">🖼️ Add from Gallery</button>
           </div>
           <input id="pics" type="file" accept="image/*" capture="environment" multiple style="display:none">
           <div class="hint" id="pics_status"></div>
@@ -191,7 +181,6 @@
       </div>
       <div class="actions">
         <button class="btn" id="submit_btn">Submit</button>
-        <button class="btn secondary" id="receive_new_btn" title="Use new simplified workflow">Receive (New Flow)</button>
       </div>
       <div id="other_status" style="margin-top:12px; font-size:14px; line-height:1.4;"></div>
     </div>
@@ -601,10 +590,10 @@
               const url = (d && d.order_url) ? d.order_url : (obj.app_url||'');
               const statusEl = document.getElementById('quartzy_order_status');
               const html = `
-                <div style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
-                  <div style="font-weight:600; margin-bottom:6px;">No inventory match found</div>
+                <div style="padding:10px 10px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
+                  <div style="font-weight:600; margin-bottom:5px;">No inventory match found</div>
                   <div class="hint" style="margin-bottom:8px;">Open the order in Quartzy to complete reception manually.</div>
-                  ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn">Open Order in Quartzy</a>` : ''}
+                  <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn">Open Order in Quartzy</a>` : ''}</div>
                 </div>`;
               if(statusEl) statusEl.innerHTML = html;
               // Keep form hidden and end overlay
@@ -618,11 +607,7 @@
             document.getElementById('inventory_item_id').value = d.inventory_item_id || '';
             // Expected quantity UI
             const expectedEl = document.getElementById('expected_quantity');
-            const expectedWrap = document.getElementById('expected_wrap');
-            const expectedDisplay = document.getElementById('expected_display');
-            expectedEl.value = obj.quantity_expected || '';
-            expectedWrap.style.display = obj.quantity_expected? '': 'none';
-            expectedDisplay.textContent = obj.quantity_expected? `${obj.quantity_expected} expected`: '';
+            if (expectedEl) expectedEl.value = obj.quantity_expected || '';
             const frac = document.getElementById('quantity_fraction');
             if (frac){ if (obj.quantity_expected){ frac.textContent = `/ ${obj.quantity_expected}`; frac.style.display = ''; } else { frac.textContent = ''; frac.style.display = 'none'; } }
             const qtyEl = document.getElementById('quantity'); if (qtyEl && obj.quantity_expected) qtyEl.value = obj.quantity_expected;
@@ -642,7 +627,7 @@
             const html = `
               <div style="padding:10px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
                 <div style="font-weight:600; margin-bottom:15px;">No match in inventory</div>
-                ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn">Open Order in Quartzy</a>` : ''}
+                <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn">Open Order in Quartzy</a>` : ''}</div>
               </div>`;
             if(statusEl) statusEl.innerHTML = html;
             setOverlayState('error'); hideOverlay(600);
@@ -1157,7 +1142,7 @@
           setOtherStatus(`<div class="card" style="padding:10px 14px; border:1px solid #d0d5dd; border-radius:10px; background:#f8fafb;">
             <div style=\"font-weight:600; margin-bottom:6px;\">No inventory match</div>
             <div class=\"hint\" style=\"margin-bottom:8px;\">Open the order in Quartzy to complete reception manually.</div>
-            <a href=\"${d.order_url}\" target=\"_blank\" rel=\"noopener\" class=\"btn\">Open Order in Quartzy</a>
+            <div style=\"margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;\"><a href=\"${d.order_url}\" target=\"_blank\" rel=\"noopener\" class=\"btn\">Open Order in Quartzy</a></div>
           </div>`);
           setOverlayState('success'); hideOverlay(600);
           return;
