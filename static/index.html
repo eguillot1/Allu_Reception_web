@@ -92,6 +92,19 @@
       </div></div>
     </div>
 
+    <!-- Quartzy: Order selection (visible in Quartzy mode; form stays hidden until match) -->
+    <div class="card" id="quartzy_order_card" style="display:none;">
+      <div class="row">
+        <div class="col-12">
+          <h2>Select Quartzy Order</h2>
+          <label for="quartzy_order">Quartzy Order Request</label>
+          <select id="quartzy_order"><option value="">Select Order Request</option></select>
+          <div class="hint" id="quartzy_order_hint">Select an ORDERED request; we'll check inventory automatically. If there is no match, open the Quartzy order page and proceed manually.</div>
+          <div id="quartzy_order_status" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Samples Form (kept minimal so UI loads) -->
     <div class="card" id="samples_form" style="display:none;">
       <h2>Samples Reception</h2>
@@ -107,11 +120,6 @@
     <!-- Other Items Form -->
     <div class="card" id="other_form" style="display:none;">
       <div class="row">
-        <div class="col-12">
-          <label for="quartzy_order">Quartzy Order Request</label>
-          <select id="quartzy_order"><option value="">Select Order Request</option></select>
-          <div class="hint" id="quartzy_order_hint">Only ORDERED requests are listed.</div>
-        </div>
         <div class="col-6">
           <label>Item Name</label>
           <input id="item_name" placeholder="Item Name" required>
@@ -478,13 +486,28 @@
       [...document.querySelectorAll('#item_type_toggle .item-type-square')].forEach(b=>b.classList.remove('selected'));
       btn.classList.add('selected'); const v = btn.dataset.value;
       dbg('Item Type Toggle', ()=>{ console.log('Selected:', v); });
-      // Show Samples form only when Samples selected
-      document.getElementById('samples_form').style.display = (v==='Samples')? '': 'none';
-      // Show other_form for both 'Other' and 'Quartzy' values
-      document.getElementById('other_form').style.display = (v==='Other' || v==='Quartzy')? '': 'none';
-      // When user picks Quartzy/Other, load Quartzy-specific data
-      if (v==='Other' || v==='Quartzy') { loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations(); }
-      if (v==='Samples') { loadSamplesProjects(); }
+      // Base: hide all
+      const samplesForm = document.getElementById('samples_form');
+      const otherForm = document.getElementById('other_form');
+      const orderCard = document.getElementById('quartzy_order_card');
+      const matchHint = document.getElementById('quartzy_match_hint');
+      if (samplesForm) samplesForm.style.display = 'none';
+      if (otherForm) otherForm.style.display = 'none';
+      if (orderCard) orderCard.style.display = 'none';
+      if (matchHint) matchHint.style.display = 'none';
+      // Show per selection
+      if (v==='Samples'){
+        if (samplesForm) samplesForm.style.display = '';
+        loadSamplesProjects();
+      } else if (v==='Other'){
+        if (otherForm) otherForm.style.display = '';
+        // Non-Quartzy "Other" still benefits from employees/locations
+        loadEmployees('received_by'); initQuartzyLocations();
+      } else if (v==='Quartzy'){
+        if (orderCard) orderCard.style.display = '';
+        if (matchHint) matchHint.style.display = '';
+        loadQuartzyOrders(); loadEmployees('received_by'); initQuartzyLocations();
+      }
     });
 
     // Employees
@@ -588,6 +611,8 @@
             else { frac.textContent = ''; frac.style.display = 'none'; }
           }
           const qtyEl = document.getElementById('quantity'); if (qtyEl && obj.quantity_expected) qtyEl.value = obj.quantity_expected;
+          // Reveal the form after an order is selected (Quartzy flow)
+          try{ const otherForm = document.getElementById('other_form'); if (otherForm) otherForm.style.display = ''; }catch{}
           // Auto-run inventory candidate search if we have a catalog number
           const cat = (document.getElementById('catalog_number')?.value||'').trim();
           if (cat) { try{ findInventoryCandidates(); }catch{} }
@@ -748,16 +773,6 @@
     // Submit Other form
     const otherSubmitBtn = document.getElementById('submit_btn');
     otherSubmitBtn.addEventListener('click', async ()=>{
-      // Pre-open a blank tab to bypass popup blockers; navigate it only if needed
-      let preTab = null;
-      try {
-        preTab = window.open('about:blank', '_blank');
-        // Optional: light placeholder so users know it's intentional
-        if (preTab && preTab.document) {
-          preTab.document.write('<!doctype html><title>Quartzy Add (standby)</title><body style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:20px;color:#00334f;">Waiting for submission…</body>');
-          preTab.document.close();
-        }
-      } catch (_) { /* ignored */ }
   const orderId = document.getElementById('quartzy_order')?.value || '';
       const itemName = document.getElementById('item_name')?.value?.trim() || '';
       const quantity = document.getElementById('quantity')?.value || '';
@@ -861,8 +876,6 @@
                </div>`
             + `</div>`;
           setOtherStatus(orderCard + invCard);
-          // Close the standby tab since inventory is handled
-          try { if (preTab && !preTab.closed) preTab.close(); } catch(_){}
           document.getElementById('inv_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Inventory Update Full Debug]','color:#0b7285;font-weight:700'); console.dir(window._lastInventoryUpdate||{}); console.groupEnd(); }catch{} });
           document.getElementById('inv_copy_debug')?.addEventListener('click',()=>{ try{ const p=JSON.stringify(window._lastInventoryUpdate||{},null,2); copyToClipboard(p);}catch{} });
           document.getElementById('qz_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Quartzy Full Debug]','color:#7c3aed;font-weight:700'); console.dir(window._lastQuartzyStatus||{}); console.groupEnd(); }catch{} });
@@ -1015,8 +1028,7 @@
           setOtherStatus(html);
           // Add helper UI inside the Inventory status card
           try{ const card = document.getElementById('inventory_status_card'); if(card) appendQuartzyHelperUI(card); }catch{}
-          // Navigate the pre-opened tab to the prefilled Add Item link
-          try { if (preTab && !preTab.closed) preTab.location.href = chosen.url; } catch(_){ }
+          
           document.getElementById('copy_all_add_fields')?.addEventListener('click', ()=> copyToClipboard(copyAll));
           document.querySelectorAll('#other_status [data-copy]')?.forEach(btn=>{ btn.addEventListener('click', ()=>{ const v=decodeURIComponent(btn.getAttribute('data-copy')||''); copyToClipboard(v); }); });
           document.getElementById('qz_show_debug')?.addEventListener('click',(e)=>{ e.preventDefault(); try{ console.group('%c[Quartzy Full Debug]','color:#7c3aed;font-weight:700'); console.dir(window._lastQuartzyStatus||{}); console.groupEnd(); }catch{} });
