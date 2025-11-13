@@ -7,3 +7,4 @@ flask
 pytest
 playwright
 chromium
+python-multipart  # needed for FastAPI Form() parsing (fix /api/submit 404 on Render)
