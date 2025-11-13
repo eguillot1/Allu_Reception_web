@@ -457,6 +457,21 @@ async def submit_reception(
         ck_ok = isinstance(results.get("clickup"), dict) and bool(results["clickup"].get("success") is True)
         q_ok = isinstance(results.get("quartzy"), dict) and bool(results["quartzy"].get("success") is True)
         overall_success = pa_ok or ck_ok or q_ok
+        # Add a helpful diagnostic when both external integrations appear disabled/misconfigured
+        try:
+            if not (pa_ok or ck_ok or q_ok):
+                from app.config import CONFIG as _CFG
+                diag = {
+                    "power_automate_webhook_present": bool(_CFG.power_automate.webhook_url),
+                    "clickup_token_present": bool(_CFG.clickup.api_token),
+                    "clickup_list_present": bool(_CFG.clickup.list_id),
+                    "clickup_team_present": bool(_CFG.clickup.team_id),
+                    "quartzy_enabled": bool(_CFG.quartzy.enabled),
+                    "quartzy_token_present": bool(_CFG.quartzy.api_token),
+                }
+                results["diagnostic"] = diag
+        except Exception:
+            pass
 
     return SubmitResult(
         power_automate=results.get("power_automate"),
@@ -465,6 +480,33 @@ async def submit_reception(
         quartzy_inventory=results.get("quartzy_inventory_upsert") or results.get("quartzy_inventory"),
         overall_success=overall_success,
     )
+
+@router.get("/config/status")
+def config_status():
+    """Lightweight config status endpoint to validate deployment settings."""
+    from app.config import CONFIG as _CFG
+    try:
+        return {
+            "power_automate": {
+                "webhook_present": bool(_CFG.power_automate.webhook_url),
+                "max_inline_bytes": int(_CFG.power_automate.max_inline_bytes or 0),
+            },
+            "clickup": {
+                "token_present": bool(_CFG.clickup.api_token),
+                "team_id_present": bool(_CFG.clickup.team_id),
+                "list_id_present": bool(_CFG.clickup.list_id),
+                "received_status_value": _CFG.clickup.received_status_value or "",
+            },
+            "quartzy": {
+                "enabled": bool(_CFG.quartzy.enabled),
+                "token_present": bool(_CFG.quartzy.api_token),
+                "base_url": _CFG.quartzy.base_url,
+                "org_id_present": bool(_CFG.quartzy.org_id),
+                "lab_id_present": bool(_CFG.quartzy.lab_id),
+            },
+        }
+    except Exception as e:  # pragma: no cover
+        return {"error": str(e)}
 
 @router.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
