@@ -137,6 +137,7 @@ async def submit_reception(
                 received_by_id=payload.received_by_id or "",
                 client=payload.client or "",
                 comments=payload.comments or "",
+                form_type=payload.form_type or "",
                 file_paths=[],
                 links_only=False,
                 timeout=pa_http_timeout,

@@ -28,6 +28,7 @@ def post_to_power_automate_structured(
     received_by_id: str = "",
     client: str = "",
     comments: str = "",
+    form_type: str = "",
     file_paths: Optional[List[str]] = None,
     links_only: bool = False,
     timeout: int = 120,
@@ -73,9 +74,11 @@ def post_to_power_automate_structured(
         auto_switched = True
         links_only = True
         files_payload = [{"filename": f.get("filename"), "note": "omitted (links_only)"} for f in files_payload]
+    # Business rule: if client is provided and supplier is empty, set supplier = client
+    effective_supplier = supplier or (client or "")
     payload = {
         "item_name": item_name or "",
-        "supplier": supplier or "",
+        "supplier": effective_supplier,
         "quantity": str(quantity or ""),
         "item_type": item_type or "",
         "project_manager": project_manager or "",
@@ -93,6 +96,7 @@ def post_to_power_automate_structured(
             "auto_switched": auto_switched,
             "total_encoded_bytes": total_encoded_bytes,
             "max_inline_threshold": max_inline,
+            "form_type": (form_type or ""),
         }
     }
     debug_payload = {

@@ -1368,6 +1368,9 @@
       const comments = document.getElementById('samples_comments')?.value || '';
       const pm = document.getElementById('samples_pm')?.value || '';
       const bsl2 = (document.getElementById('samples_bsl2')?.value || '') === '1';
+      // Determine the selected task's name to send as item_name
+      const taskObj = (_samplesTasksCache||[]).find(t=> String(t.id)===String(taskId));
+      const taskName = taskObj && taskObj.name ? String(taskObj.name) : '';
       showOverlay('Submitting sample reception...');
       const samplesPics = await uploadSelectedPictures('samples_pics');
       const payload = new URLSearchParams({
@@ -1375,7 +1378,10 @@
         client, package_status,
         storage_location: storage, location: locationVal, sub_location: subLoc,
         received_by, received_by_id, comments, pictures: samplesPics.join(','),
-        project_manager: pm, bsl2: String(bsl2)
+        project_manager: pm, bsl2: String(bsl2),
+        // Ensure Power Automate receives the correct fields
+        item_type: 'Samples',
+        item_name: taskName
       });
       try{
         const resp = await fetchWithTimeout('/api/submit', { method:'POST', body: payload }, 60000);
