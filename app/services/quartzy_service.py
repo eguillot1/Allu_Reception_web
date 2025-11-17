@@ -434,6 +434,15 @@ class QuartzyService:
                     return val
         return []
 
+    def build_quartzy_order_link(self, order_id: str) -> str:
+        """Build the Quartzy UI URL for an order request.
+        Uses the configured base_url and points to /order-requests/{id}.
+        """
+        if not order_id:
+            return ""
+        base = (self.base_url or "").rstrip('/')
+        return f"{base}/order-requests/{str(order_id).strip()}"
+
     def _candidate_inventory_endpoints(self, lab_id: Optional[str]) -> List[Tuple[str, Dict[str, Any]]]:
         base = self.base_url.rstrip('/')
         candidates: List[Tuple[str, Dict[str, Any]]] = []

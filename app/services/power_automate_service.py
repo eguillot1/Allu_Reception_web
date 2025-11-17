@@ -29,6 +29,7 @@ def post_to_power_automate_structured(
     client: str = "",
     comments: str = "",
     form_type: str = "",
+    url: str = "",
     file_paths: Optional[List[str]] = None,
     links_only: bool = False,
     timeout: int = 120,
@@ -90,6 +91,7 @@ def post_to_power_automate_structured(
         "received_by_id": received_by_id or "",
         "client": client or "",
         "comments": comments or "",
+        "url": url or "",
         "links_only": bool(links_only),
         "files": files_payload,
         "_meta": {
@@ -106,7 +108,8 @@ def post_to_power_automate_structured(
         "quantity": payload["quantity"],
         "item_type": payload["item_type"],
         "status": payload["status"],
-    "client": payload["client"],
+        "client": payload["client"],
+        "url": payload["url"],
         "links_only": payload["links_only"],
         "files_count": len(files_payload),
         "filenames": [f.get("filename") for f in files_payload],
@@ -157,6 +160,7 @@ def post_to_power_automate(data: dict):
         client=data.get("client", ""),
         comments=data.get("comments", ""),
         file_paths=file_paths,
+        url=data.get("url", ""),
         links_only=bool(data.get("links_only", False)),
     )
 
