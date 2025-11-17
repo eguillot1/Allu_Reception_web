@@ -113,62 +113,54 @@ async def submit_reception(
     from datetime import datetime as _dt
     ts_iso = payload.timestamp or _dt.utcnow().isoformat()
 
-    # Power Automate first (always attempts) but do not block the response for long
-    try:
-        import asyncio
-        import os as _os
-        # Allow tuning via env: hard API timeout for the PA HTTP call and how long we wait before returning
-        pa_http_timeout = int(_os.getenv("PA_TIMEOUT_S", "30") or 30)
-        pa_wait_before_return = float(_os.getenv("PA_WAIT_BEFORE_RETURN_S", "6") or 6)
-
-        # Compute best URL to include in PA payload: prefer ClickUp task URL for Samples,
-        # else Quartzy order URL for Other when order_id present.
-        pa_url = ""
+    # Power Automate dispatch:
+    # For 'samples' we can fire early with ClickUp URL; for 'other' we defer until after Quartzy status update so we can use the exact path used.
+    pa_deferred_other = (form_type == "other")
+    pa_early_sent = False
+    if not pa_deferred_other:
         try:
+            import asyncio
+            import os as _os
+            pa_http_timeout = int(_os.getenv("PA_TIMEOUT_S", "30") or 30)
+            pa_wait_before_return = float(_os.getenv("PA_WAIT_BEFORE_RETURN_S", "6") or 6)
+            pa_url = ""
             if (form_type or "").lower() == "samples" and payload.task_id:
                 pa_url = f"https://app.clickup.com/t/{str(payload.task_id).strip()}"
-            elif (form_type or "").lower() == "other" and payload.order_id:
-                try:
-                    pa_url = quartzy_service.quartzy_service.build_quartzy_order_link(str(payload.order_id).strip())
-                except Exception:
-                    pa_url = ""
-        except Exception:
-            pa_url = ""
-
-        def _call_pa_sync():
-            return pa_service.post_to_power_automate_structured(
-                item_name=payload.item_name,
-                supplier=payload.supplier or "",
-                quantity=payload.quantity or "",
-                item_type=payload.item_type or "",
-                project_manager=payload.project_manager or "",
-                bsl2=str(bool(payload.bsl2)),
-                status=(payload.package_status or ""),
-                storage_location=payload.storage_location or payload.location or "",
-                location=payload.location or "",
-                sub_location=payload.sub_location or "",
-                received_by=payload.received_by or "",
-                received_by_id=payload.received_by_id or "",
-                client=payload.client or "",
-                comments=payload.comments or "",
-                file_paths=[],
-                url=pa_url,
-                links_only=False,
-                timeout=pa_http_timeout,
-            )
-
-        # Run in background thread but wait briefly for a quick success
-        pa_future = asyncio.to_thread(_call_pa_sync)
-        try:
-            pa_ok, pa_msg, pa_dbg = await asyncio.wait_for(pa_future, timeout=pa_wait_before_return)
-            results["power_automate"] = (pa_ok, pa_msg, pa_dbg)
-        except asyncio.TimeoutError:
-            # Keep running in the background; respond now so UI doesn't hang
-            results["power_automate"] = {"queued": True, "note": f"continuing asynchronously (waited {pa_wait_before_return}s)"}
-        success_flags.append(True)
-    except Exception as e:
-        results["power_automate"] = {"error": str(e)}
-        success_flags.append(False)
+            def _call_pa_sync():
+                return pa_service.post_to_power_automate_structured(
+                    item_name=payload.item_name,
+                    supplier=payload.supplier or "",
+                    quantity=payload.quantity or "",
+                    item_type=payload.item_type or "",
+                    project_manager=payload.project_manager or "",
+                    bsl2=str(bool(payload.bsl2)),
+                    status=(payload.package_status or ""),
+                    storage_location=payload.storage_location or payload.location or "",
+                    location=payload.location or "",
+                    sub_location=payload.sub_location or "",
+                    received_by=payload.received_by or "",
+                    received_by_id=payload.received_by_id or "",
+                    client=payload.client or "",
+                    comments=payload.comments or "",
+                    file_paths=[],
+                    url=pa_url,
+                    links_only=False,
+                    timeout=pa_http_timeout,
+                )
+            pa_future = asyncio.to_thread(_call_pa_sync)
+            try:
+                pa_ok, pa_msg, pa_dbg = await asyncio.wait_for(pa_future, timeout=pa_wait_before_return)
+                results["power_automate"] = (pa_ok, pa_msg, pa_dbg)
+            except asyncio.TimeoutError:
+                results["power_automate"] = {"queued": True, "note": f"continuing asynchronously (waited {pa_wait_before_return}s)"}
+            success_flags.append(True)
+            pa_early_sent = True
+        except Exception as e:
+            results["power_automate"] = {"error": str(e)}
+            success_flags.append(False)
+    else:
+        # Mark as deferred so UI/tests know intent
+        results["power_automate"] = {"deferred": True, "reason": "waiting_for_quartzy_order_path"}
 
     # ClickUp updates only for samples form
     if form_type == "samples" and payload.task_id:
@@ -371,6 +363,57 @@ async def submit_reception(
                     q_resp["success"] = bool(q_resp.get("updated"))
                 results["quartzy"] = q_resp
                 success_flags.append(True)
+                # Now that we have Quartzy response, send Power Automate (deferred case only)
+                if pa_deferred_other and not pa_early_sent:
+                    try:
+                        import asyncio
+                        import os as _os
+                        pa_http_timeout = int(_os.getenv("PA_TIMEOUT_S", "30") or 30)
+                        pa_wait_before_return = float(_os.getenv("PA_WAIT_BEFORE_RETURN_S", "6") or 6)
+                        # Prefer exact path used for status update; fallback to build_quartzy_order_link
+                        pa_url = ""
+                        try:
+                            if isinstance(q_resp, dict):
+                                pa_url = q_resp.get("path") or ""
+                            if not pa_url and payload.order_id:
+                                try:
+                                    pa_url = quartzy_service.quartzy_service.build_quartzy_order_link(str(payload.order_id).strip())
+                                except Exception:
+                                    pa_url = ""
+                        except Exception:
+                            pa_url = ""
+                        def _call_pa_sync_deferred():
+                            return pa_service.post_to_power_automate_structured(
+                                item_name=payload.item_name,
+                                supplier=payload.supplier or "",
+                                quantity=payload.quantity or "",
+                                item_type=payload.item_type or "",
+                                project_manager=payload.project_manager or "",
+                                bsl2=str(bool(payload.bsl2)),
+                                status=(payload.package_status or ""),
+                                storage_location=payload.storage_location or payload.location or "",
+                                location=payload.location or "",
+                                sub_location=payload.sub_location or "",
+                                received_by=payload.received_by or "",
+                                received_by_id=payload.received_by_id or "",
+                                client=payload.client or "",
+                                comments=payload.comments or "",
+                                file_paths=[],
+                                url=pa_url,
+                                links_only=False,
+                                timeout=pa_http_timeout,
+                            )
+                        pa_future2 = asyncio.to_thread(_call_pa_sync_deferred)
+                        try:
+                            pa_ok, pa_msg, pa_dbg = await asyncio.wait_for(pa_future2, timeout=pa_wait_before_return)
+                            results["power_automate"] = (pa_ok, pa_msg, pa_dbg)
+                        except asyncio.TimeoutError:
+                            results["power_automate"] = {"queued": True, "note": f"continuing asynchronously (waited {pa_wait_before_return}s)", "deferred": True}
+                        # Treat PA as success path for overall success calc
+                        success_flags.append(True)
+                    except Exception as _e_pa_def:
+                        results["power_automate"] = {"error": str(_e_pa_def), "deferred": True}
+                        success_flags.append(False)
             else:
                 # Partial: choose adjust mode (api: annotate via notes; ui: start Playwright job). Do not change status.
                 # Compute remaining
@@ -414,6 +457,52 @@ async def submit_reception(
                 # Return metadata; consider this path successful from API perspective
                 results["quartzy"] = adjust_meta
                 success_flags.append(True)
+                # Even on partial, still send PA with path or fallback link if deferred
+                if pa_deferred_other and not pa_early_sent:
+                    try:
+                        import asyncio
+                        import os as _os
+                        pa_http_timeout = int(_os.getenv("PA_TIMEOUT_S", "30") or 30)
+                        pa_wait_before_return = float(_os.getenv("PA_WAIT_BEFORE_RETURN_S", "6") or 6)
+                        pa_url = ""
+                        try:
+                            if isinstance(adjust_meta, dict):
+                                pa_url = adjust_meta.get("path") or ""
+                            if not pa_url and payload.order_id:
+                                pa_url = quartzy_service.quartzy_service.build_quartzy_order_link(str(payload.order_id).strip())
+                        except Exception:
+                            pa_url = ""
+                        def _call_pa_sync_deferred_partial():
+                            return pa_service.post_to_power_automate_structured(
+                                item_name=payload.item_name,
+                                supplier=payload.supplier or "",
+                                quantity=payload.quantity or "",
+                                item_type=payload.item_type or "",
+                                project_manager=payload.project_manager or "",
+                                bsl2=str(bool(payload.bsl2)),
+                                status=(payload.package_status or ""),
+                                storage_location=payload.storage_location or payload.location or "",
+                                location=payload.location or "",
+                                sub_location=payload.sub_location or "",
+                                received_by=payload.received_by or "",
+                                received_by_id=payload.received_by_id or "",
+                                client=payload.client or "",
+                                comments=payload.comments or "",
+                                file_paths=[],
+                                url=pa_url,
+                                links_only=False,
+                                timeout=pa_http_timeout,
+                            )
+                        pa_future_partial = asyncio.to_thread(_call_pa_sync_deferred_partial)
+                        try:
+                            pa_ok, pa_msg, pa_dbg = await asyncio.wait_for(pa_future_partial, timeout=pa_wait_before_return)
+                            results["power_automate"] = (pa_ok, pa_msg, pa_dbg)
+                        except asyncio.TimeoutError:
+                            results["power_automate"] = {"queued": True, "note": f"continuing asynchronously (waited {pa_wait_before_return}s)", "deferred": True}
+                        success_flags.append(True)
+                    except Exception as _e_pa_def2:
+                        results["power_automate"] = {"error": str(_e_pa_def2), "deferred": True}
+                        success_flags.append(False)
         except Exception as e:
             results["quartzy"] = {"error": str(e)}
             success_flags.append(False)
